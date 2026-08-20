@@ -13,7 +13,7 @@ const ADMIN_USER_KEY = 'civicresolve_admin_user';
 export const API_BASE_URL = (
   (import.meta as any).env?.VITE_API_URL ||
   (import.meta as any).env?.VITE_API_BASE_URL ||
-  ''
+  ((import.meta as any).env?.PROD ? 'https://cevic-resolver-ai.onrender.com' : '')
 ).replace(/\/$/, '');
 
 /** Helper to transform database row to frontend Complaint model */
