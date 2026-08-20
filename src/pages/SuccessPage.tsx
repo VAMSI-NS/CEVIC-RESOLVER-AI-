@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle, Copy, Search, ArrowRight, Clock, Building2, MapPin } from 'lucide-react';
-import { getComplaintById } from '../services/complaintService';
+import { getComplaintById, fetchComplaintByIdApi } from '../services/complaintService';
 import PriorityBadge from '../components/PriorityBadge';
 import StatusBadge from '../components/StatusBadge';
 import type { Complaint } from '../types';
 import { useToast, ToastContainer } from '../components/Toast';
 
 // ============================================================
-// Success Page — Complaint registered confirmation
+// Success Page - Complaint registered confirmation
 // ============================================================
 
 const SuccessPage: React.FC = () => {
@@ -22,6 +22,11 @@ const SuccessPage: React.FC = () => {
     if (!id) return;
     const found = getComplaintById(id);
     if (found) setComplaint(found);
+
+    // Also fetch from SQL Database
+    fetchComplaintByIdApi(id).then((fresh) => {
+      if (fresh) setComplaint(fresh);
+    });
   }, [id]);
 
   const handleCopy = () => {
@@ -46,17 +51,17 @@ const SuccessPage: React.FC = () => {
             <div className="absolute inset-0 border-4 border-green-200 rounded-full animate-ping opacity-30" />
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 mt-4 mb-2">
-            🎉 Complaint Successfully Registered
+            ✅ Complaint Successfully Registered
           </h1>
           <p className="text-gray-500">
-            Your complaint has been analyzed and routed to the appropriate authority.
+            Your complaint has been saved in the SQL database and routed to the appropriate authority.
           </p>
         </div>
 
         {/* Complaint ID card */}
         <div className="card mb-5 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-100">
           <div className="text-center">
-            <p className="text-sm text-gray-500 mb-2">Your Complaint ID</p>
+            <p className="text-sm text-gray-500 mb-2">Your Unique Ticket ID</p>
             <div className="flex items-center justify-center gap-3">
               <span className="text-3xl font-mono font-extrabold text-indigo-700 tracking-wider">
                 {id}
@@ -70,7 +75,7 @@ const SuccessPage: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-indigo-600 mt-2 font-medium">
-              Save this ID to track your complaint
+              Save this ID to track your complaint status anytime
             </p>
           </div>
         </div>
@@ -147,7 +152,7 @@ const SuccessPage: React.FC = () => {
               'Department team reviews your complaint',
               'Field officer assigned within 2-4 hours',
               'Site inspection scheduled',
-              'You\'ll be notified at each step',
+              'You will be notified as status updates occur',
             ].map((step, i) => (
               <li key={i} className="flex items-center gap-2 text-sm text-indigo-700">
                 <CheckCircle className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />

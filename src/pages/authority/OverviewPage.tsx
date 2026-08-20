@@ -1,34 +1,67 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ClipboardList, AlertTriangle, CheckCircle, Clock,
-  TrendingUp, ArrowRight, Brain, RefreshCw
+  ClipboardList, AlertTriangle, Clock, CheckCircle,
+  Brain, RefreshCw, ArrowRight, TrendingUp
 } from 'lucide-react';
 import DashboardCard from '../../components/DashboardCard';
 import PriorityBadge from '../../components/PriorityBadge';
 import StatusBadge from '../../components/StatusBadge';
-import { getAllComplaints, getAnalyticsSummary } from '../../services/complaintService';
+import {
+  getAllComplaints,
+  getAnalyticsSummary,
+  fetchAllComplaintsApi,
+  fetchDashboardStatsApi,
+} from '../../services/complaintService';
 import type { Complaint } from '../../types';
 import { formatDateTime, getCategoryEmoji, truncate } from '../../utils/helpers';
 
 // ============================================================
-// Authority Dashboard — Overview Page
+// Authority Dashboard - Overview Page
 // ============================================================
 
 const OverviewPage: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [summary, setSummary] = useState(getAnalyticsSummary());
 
-  useEffect(() => {
-    const all = getAllComplaints();
-    setComplaints(all.slice(0, 6)); // Recent 6
+  const loadData = async () => {
+    // 1. Initial cached state
+    const localAll = getAllComplaints();
+    setComplaints(localAll.slice(0, 6));
     setSummary(getAnalyticsSummary());
+
+    // 2. Fetch live data from SQL backend
+    try {
+      const [freshComplaints, stats] = await Promise.all([
+        fetchAllComplaintsApi(),
+        fetchDashboardStatsApi(),
+      ]);
+
+      if (freshComplaints && freshComplaints.length > 0) {
+        setComplaints(freshComplaints.slice(0, 6));
+      }
+
+      if (stats && stats.total !== undefined) {
+        setSummary((prev) => ({
+          ...prev,
+          totalComplaints: stats.total,
+          highPriority: stats.high || 0,
+          pending: (stats.registered || 0) + (stats.under_review || 0) + (stats.assigned || 0) + (stats.in_progress || 0),
+          resolved: stats.resolved || 0,
+          resolutionRate: stats.total > 0 ? Math.round(((stats.resolved || 0) / stats.total) * 100) : prev.resolutionRate,
+        }));
+      }
+    } catch (err) {
+      console.warn('Live overview fetch failed, using local values:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   const handleRefresh = () => {
-    const all = getAllComplaints();
-    setComplaints(all.slice(0, 6));
-    setSummary(getAnalyticsSummary());
+    loadData();
   };
 
   return (
@@ -37,7 +70,7 @@ const OverviewPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">Civic Operations Center</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Real-time complaint management dashboard</p>
+          <p className="text-gray-500 text-sm mt-0.5">Real-time PostgreSQL database complaint management dashboard</p>
         </div>
         <button
           onClick={handleRefresh}
@@ -53,7 +86,7 @@ const OverviewPage: React.FC = () => {
         <DashboardCard
           title="Total Complaints"
           value={summary.totalComplaints.toLocaleString()}
-          subtitle="All time"
+          subtitle="All time (Database)"
           icon={<ClipboardList className="w-6 h-6" />}
           color="indigo"
           trend={{ value: 12, label: 'this month' }}
@@ -146,7 +179,7 @@ const OverviewPage: React.FC = () => {
               <span className="text-xl flex-shrink-0">{getCategoryEmoji(c.category)}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">{truncate(c.title, 50)}</p>
-                <p className="text-xs text-gray-400 mt-0.5 font-mono">{c.id} · {c.location.split(',')[0]}</p>
+                <p className="text-xs text-gray-400 mt-0.5 font-mono">{c.id} • {c.location.split(',')[0]}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <PriorityBadge priority={c.priority} size="sm" />

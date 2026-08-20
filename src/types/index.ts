@@ -4,6 +4,12 @@
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type ComplaintStatus =
+  | 'REGISTERED'
+  | 'UNDER_REVIEW'
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'RESOLVED'
+  | 'REJECTED'
   | 'Submitted'
   | 'AI_Analysis'
   | 'Routed'
@@ -20,6 +26,7 @@ export type Category =
   | 'Drainage'
   | 'Water'
   | 'Streetlights'
+  | 'Electricity'
   | 'Infrastructure'
   | 'Other';
 
@@ -34,7 +41,12 @@ export interface TimelineEvent {
 }
 
 export interface Complaint {
-  id: string;
+  id: string; // Ticket ID e.g. CR-2026-000001
+  ticket_id?: string;
+  citizenName?: string;
+  citizen_name?: string;
+  phone?: string;
+  email?: string;
   title: string;
   description: string;
   category: Category;
@@ -46,6 +58,7 @@ export interface Complaint {
   longitude?: number;
   landmark?: string;
   imageUrl?: string;
+  image_url?: string;
   submittedAt: string;
   updatedAt: string;
   assignedTo?: string;
@@ -125,8 +138,8 @@ export interface Department {
 export interface MapMarker {
   id: string;
   complaintId: string;
-  x: number; // percentage 0-100
-  y: number; // percentage 0-100
+  x: number;
+  y: number;
   priority: Priority;
   status: ComplaintStatus;
   title: string;

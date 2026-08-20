@@ -7,13 +7,14 @@ import { delay } from '../utils/helpers';
 // Replace these functions with real API calls (Gemini, OpenAI, etc.)
 // ============================================================
 
-// Keywords → Category mapping
+// Keywords â†’ Category mapping
 const categoryKeywords: Record<Category, string[]> = {
   Roads: ['pothole', 'road', 'highway', 'street', 'tarmac', 'pavement', 'lane', 'traffic', 'marking', 'footpath'],
   Garbage: ['garbage', 'trash', 'waste', 'litter', 'rubbish', 'dump', 'bin', 'stench', 'smell', 'filth', 'sanitation'],
   Drainage: ['drain', 'drainage', 'flood', 'water logging', 'waterlogging', 'sewage', 'sewer', 'blockage', 'clog', 'overflow'],
   Water: ['water', 'pipeline', 'pipe', 'supply', 'tap', 'leak', 'burst', 'contaminated', 'murky', 'dirty water'],
-  Streetlights: ['light', 'streetlight', 'lamp', 'dark', 'bulb', 'electricity', 'illumination', 'flickering'],
+  Streetlights: ['light', 'streetlight', 'lamp', 'dark', 'bulb', 'illumination', 'flickering'],
+  Electricity: ['electricity', 'wire', 'pole', 'power', 'transformer', 'shock', 'spark', 'blackout', 'short circuit'],
   Infrastructure: ['bridge', 'footpath', 'sidewalk', 'bench', 'park', 'building', 'wall', 'structure', 'crack', 'collapse', 'broken'],
   Other: [],
 };
@@ -234,7 +235,7 @@ export async function getChatResponse(
 
   if (isGreeting) {
     return {
-      message: "Hello! 👋 I'm **Civic AI**, your smart assistant for civic complaints. I can help you:\n\n• 📝 **Report a civic problem** (potholes, garbage, drainage, lights, water)\n• 🔍 **Track your complaint** status\n• 📊 **Understand AI routing** decisions\n\nWhat civic issue can I help you with today?",
+      message: "Hello! ðŸ‘‹ I'm **Civic AI**, your smart assistant for civic complaints. I can help you:\n\nâ€¢ ðŸ“ **Report a civic problem** (potholes, garbage, drainage, lights, water)\nâ€¢ ðŸ” **Track your complaint** status\nâ€¢ ðŸ“Š **Understand AI routing** decisions\n\nWhat civic issue can I help you with today?",
     };
   }
 
@@ -248,7 +249,7 @@ export async function getChatResponse(
     chatContext.lastCategory = 'Water';
     chatContext.locationAsked = true;
     return {
-      message: "🔍 I understand this as a **Water Supply / Infrastructure issue**.\n\nThis could involve:\n• Broken pipelines\n• Water supply disruption\n• Water contamination\n• Leakage\n\nCan you tell me the **exact location or a nearby landmark**? This helps route your complaint to the correct zone team.",
+      message: "ðŸ” I understand this as a **Water Supply / Infrastructure issue**.\n\nThis could involve:\nâ€¢ Broken pipelines\nâ€¢ Water supply disruption\nâ€¢ Water contamination\nâ€¢ Leakage\n\nCan you tell me the **exact location or a nearby landmark**? This helps route your complaint to the correct zone team.",
     };
   }
 
@@ -256,7 +257,7 @@ export async function getChatResponse(
     chatContext.lastCategory = 'Roads';
     chatContext.locationAsked = true;
     return {
-      message: "🔍 I understand this as a **Road Infrastructure issue**.\n\nThis likely involves:\n• Pothole or road damage\n• Road surface deterioration\n• Safety hazard for vehicles\n\nCan you provide the **location or nearest landmark**? Our AI will determine the exact zone and assign the right team.",
+      message: "ðŸ” I understand this as a **Road Infrastructure issue**.\n\nThis likely involves:\nâ€¢ Pothole or road damage\nâ€¢ Road surface deterioration\nâ€¢ Safety hazard for vehicles\n\nCan you provide the **location or nearest landmark**? Our AI will determine the exact zone and assign the right team.",
     };
   }
 
@@ -264,7 +265,7 @@ export async function getChatResponse(
     chatContext.lastCategory = 'Garbage';
     chatContext.locationAsked = true;
     return {
-      message: "🔍 I understand this as a **Sanitation / Garbage issue**.\n\nThis involves:\n• Garbage accumulation\n• Overflowing bins\n• Illegal dumping\n\nWhere is this happening? Please share the **location or nearby landmark**.",
+      message: "ðŸ” I understand this as a **Sanitation / Garbage issue**.\n\nThis involves:\nâ€¢ Garbage accumulation\nâ€¢ Overflowing bins\nâ€¢ Illegal dumping\n\nWhere is this happening? Please share the **location or nearby landmark**.",
     };
   }
 
@@ -272,7 +273,7 @@ export async function getChatResponse(
     chatContext.lastCategory = 'Drainage';
     chatContext.locationAsked = true;
     return {
-      message: "🔍 I understand this as a **Drainage / Flooding issue**.\n\nThis involves:\n• Clogged drains\n• Waterlogging\n• Flooding during rain\n\nPlease share the **location** so I can route it to the correct drainage team.",
+      message: "ðŸ” I understand this as a **Drainage / Flooding issue**.\n\nThis involves:\nâ€¢ Clogged drains\nâ€¢ Waterlogging\nâ€¢ Flooding during rain\n\nPlease share the **location** so I can route it to the correct drainage team.",
     };
   }
 
@@ -280,7 +281,7 @@ export async function getChatResponse(
     chatContext.lastCategory = 'Streetlights';
     chatContext.locationAsked = true;
     return {
-      message: "🔍 I understand this as a **Street Lighting issue**.\n\nThis involves:\n• Non-functional streetlights\n• Flickering lights\n• Dark zones at night\n\nCan you tell me the **street or area name** where the lights are not working?",
+      message: "ðŸ” I understand this as a **Street Lighting issue**.\n\nThis involves:\nâ€¢ Non-functional streetlights\nâ€¢ Flickering lights\nâ€¢ Dark zones at night\n\nCan you tell me the **street or area name** where the lights are not working?",
     };
   }
 
@@ -296,7 +297,7 @@ export async function getChatResponse(
     };
 
     return {
-      message: `✅ **AI Analysis Complete!**\n\n📍 **Location:** ${userMessage}\n\n🏷️ **Category:** ${category}\n⚡ **Priority:** HIGH\n🏢 **Department:** ${deptMap[category] || 'Municipal Department'}\n\n*"Your complaint has been analyzed and the responsible department has been identified. Would you like me to create a complaint ticket for you?"*`,
+      message: `âœ… **AI Analysis Complete!**\n\nðŸ“ **Location:** ${userMessage}\n\nðŸ·ï¸ **Category:** ${category}\nâš¡ **Priority:** HIGH\nðŸ¢ **Department:** ${deptMap[category] || 'Municipal Department'}\n\n*"Your complaint has been analyzed and the responsible department has been identified. Would you like me to create a complaint ticket for you?"*`,
       suggestComplaint: true,
       category,
     };
@@ -308,6 +309,6 @@ export async function getChatResponse(
   chatContext.locationProvided = false;
 
   return {
-    message: "I can help you report civic issues like:\n\n🛣️ **Roads** — Potholes, road damage\n🗑️ **Garbage** — Waste accumulation\n🌊 **Drainage** — Flooding, blockages\n💧 **Water** — Pipeline issues, supply\n💡 **Streetlights** — Broken lights\n🏗️ **Infrastructure** — Public facility damage\n\nDescribe the problem you're facing and I'll help you report it or track an existing complaint.",
+    message: "I can help you report civic issues like:\n\nðŸ›£ï¸ **Roads** â€” Potholes, road damage\nðŸ—‘ï¸ **Garbage** â€” Waste accumulation\nðŸŒŠ **Drainage** â€” Flooding, blockages\nðŸ’§ **Water** â€” Pipeline issues, supply\nðŸ’¡ **Streetlights** â€” Broken lights\nðŸ—ï¸ **Infrastructure** â€” Public facility damage\n\nDescribe the problem you're facing and I'll help you report it or track an existing complaint.",
   };
 }

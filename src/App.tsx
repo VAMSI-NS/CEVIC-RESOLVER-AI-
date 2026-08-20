@@ -27,7 +27,7 @@ function PageLoader() {
           className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"
           aria-hidden="true"
         />
-        <p className="text-sm text-gray-500 font-medium">Loading…</p>
+        <p className="text-sm text-gray-500 font-medium">Loading CivicResolve...</p>
       </div>
     </div>
   );
@@ -55,7 +55,7 @@ function NotFoundPage() {
 
 function AppShell() {
   const location = useLocation();
-  const isAuthority = location.pathname.startsWith('/authority');
+  const isAuthority = location.pathname.startsWith('/authority') || location.pathname.startsWith('/admin');
   const unread = mockNotifications.filter((n) => !n.read).length;
 
   return (
@@ -76,6 +76,7 @@ function AppShell() {
             <Route path="/track" element={<TrackComplaintPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/authority/*" element={<AuthorityLayout />} />
+            <Route path="/admin/*" element={<AuthorityLayout />} />
             {/* Friendly 404 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

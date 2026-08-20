@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Search, MapPin, Building2, Clock, Bell, Plus, RefreshCw, AlertCircle
+  Search, MapPin, Building2, Clock, Bell, Plus, RefreshCw, AlertCircle, Loader2
 } from 'lucide-react';
-import { getComplaintById } from '../services/complaintService';
+import { getComplaintById, fetchComplaintByIdApi } from '../services/complaintService';
 import PriorityBadge from '../components/PriorityBadge';
 import StatusBadge from '../components/StatusBadge';
 import ComplaintTimeline from '../components/ComplaintTimeline';
@@ -20,6 +20,7 @@ const TrackComplaintPage: React.FC = () => {
   const { toasts, addToast, dismissToast } = useToast();
   const [inputId, setInputId] = useState(searchParams.get('id') || '');
   const [complaint, setComplaint] = useState<Complaint | null>(null);
+  const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [reminderSent, setReminderSent] = useState(false);
 
@@ -32,14 +33,43 @@ const TrackComplaintPage: React.FC = () => {
     }
   }, [searchParams]);
 
-  const doSearch = (id: string) => {
-    const result = getComplaintById(id.trim().toUpperCase());
-    if (result) {
-      setComplaint(result);
-      setNotFound(false);
-    } else {
-      setComplaint(null);
-      setNotFound(true);
+  const doSearch = async (id: string) => {
+    const searchId = id.trim().toUpperCase();
+    if (!searchId) return;
+
+    setLoading(true);
+    setNotFound(false);
+
+    try {
+      // 1. Try fetching from SQL Backend API
+      const apiResult = await fetchComplaintByIdApi(searchId);
+      if (apiResult) {
+        setComplaint(apiResult);
+        setNotFound(false);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fallback to local storage
+      const localResult = getComplaintById(searchId);
+      if (localResult) {
+        setComplaint(localResult);
+        setNotFound(false);
+      } else {
+        setComplaint(null);
+        setNotFound(true);
+      }
+    } catch (err) {
+      const localResult = getComplaintById(searchId);
+      if (localResult) {
+        setComplaint(localResult);
+        setNotFound(false);
+      } else {
+        setComplaint(null);
+        setNotFound(true);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,7 +91,7 @@ const TrackComplaintPage: React.FC = () => {
   const handleRefresh = () => {
     if (complaint) {
       doSearch(complaint.id);
-      addToast('Status refreshed!', 'info');
+      addToast('Status refreshed from database!', 'info');
     }
   };
 
@@ -80,13 +110,13 @@ const TrackComplaintPage: React.FC = () => {
             Track Your Complaint
           </h1>
           <p className="text-gray-500 mt-3">
-            Enter your complaint ID to see the current status and timeline.
+            Enter your complaint ticket ID to see real-time SQL database status and resolution timeline.
           </p>
         </div>
 
         {/* Search box */}
         <div className="card mb-6">
-          <label className="label">Enter Complaint ID</label>
+          <label className="label">Enter Ticket ID</label>
           <div className="flex gap-3">
             <input
               type="text"
@@ -95,17 +125,21 @@ const TrackComplaintPage: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder="e.g. CR-2026-004821"
               className="input-field flex-1 font-mono"
-              maxLength={16}
+              maxLength={20}
             />
-            <button onClick={handleSearch} className="btn-primary px-6 py-3 flex-shrink-0">
-              <Search className="w-4 h-4" />
-              Track
+            <button 
+              onClick={handleSearch} 
+              disabled={loading}
+              className="btn-primary px-6 py-3 flex-shrink-0"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              {loading ? 'Searching...' : 'Track'}
             </button>
           </div>
 
           {/* Quick demo IDs */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <p className="text-xs text-gray-400 w-full">Try these demo IDs:</p>
+            <p className="text-xs text-gray-400 w-full">Try these demo ticket IDs:</p>
             {['CR-2026-004821', 'CR-2026-004712', 'CR-2026-004715', 'CR-2026-004820'].map((demoId) => (
               <button
                 key={demoId}
@@ -124,7 +158,7 @@ const TrackComplaintPage: React.FC = () => {
             <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 font-semibold">Complaint not found</p>
             <p className="text-gray-400 text-sm mt-1">
-              Check the ID and try again. Format: CR-YYYY-XXXXXX
+              Check the ticket ID and try again. Format: CR-YYYY-XXXXXX
             </p>
           </div>
         )}
@@ -145,7 +179,7 @@ const TrackComplaintPage: React.FC = () => {
                 <button
                   onClick={handleRefresh}
                   className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all flex-shrink-0"
-                  title="Refresh status"
+                  title="Refresh status from database"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -172,7 +206,7 @@ const TrackComplaintPage: React.FC = () => {
                   <div>
                     <span className="font-medium">{complaint.department}</span>
                     {complaint.assignedTo && (
-                      <span className="text-xs text-indigo-500 ml-1">→ {complaint.assignedTo}</span>
+                      <span className="text-xs text-indigo-500 ml-1">👤 {complaint.assignedTo}</span>
                     )}
                   </div>
                 </div>
@@ -205,7 +239,7 @@ const TrackComplaintPage: React.FC = () => {
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   <div>
                     <p className="text-xs font-bold text-red-700">Complaint Escalated</p>
-                    <p className="text-xs text-red-600">Level {complaint.escalationLevel} — Department head has been notified.</p>
+                    <p className="text-xs text-red-600">Level {complaint.escalationLevel} - Department head has been notified.</p>
                   </div>
                 </div>
               )}
@@ -249,7 +283,7 @@ const TrackComplaintPage: React.FC = () => {
         {!complaint && !notFound && (
           <div className="card text-center py-16">
             <Search className="w-14 h-14 text-gray-200 mx-auto mb-4" />
-            <p className="text-gray-400 font-medium">Enter a Complaint ID to track its status</p>
+            <p className="text-gray-400 font-medium">Enter a Complaint Ticket ID to track its status</p>
             <p className="text-gray-300 text-sm mt-1">Format: CR-YYYY-XXXXXX</p>
           </div>
         )}

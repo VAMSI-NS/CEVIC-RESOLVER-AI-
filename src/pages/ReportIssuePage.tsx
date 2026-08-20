@@ -1,28 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, MapPin, Navigation, User, Eye, EyeOff,
-  ArrowRight, Loader2, ChevronDown
+  AlertCircle, MapPin, Navigation, User, Phone, Mail,
+  ArrowRight, Loader2, FileText, CheckCircle2
 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { ToastContainer, useToast } from '../components/Toast';
 import type { ImageAnalysis } from '../types';
 
 // ============================================================
-// Report Civic Issue Page
+// Report Civic Issue Page - Citizen Reporting Form
 // ============================================================
 
 const locationOptions = [
+  'MG Road, Near Bus Station, Vijayawada',
+  'Gandhi Nagar Main Road, Vijayawada',
+  'Benz Circle, Near Ring Road, Vijayawada',
+  'Governorpet, 4th Cross Road, Vijayawada',
+  'Auto Nagar Industrial Area, Vijayawada',
+  'Bhavanipuram, Near Market Center, Vijayawada',
   'Main Road, Near College Bus Stop',
-  'City Market Area, Gandhi Nagar',
+  'City Market Area, Sector 4',
   'Residency Road, Near Post Office',
-  'MG Road, Near Shopping Complex',
-  'Park Road, Near City Park',
-  'Brigade Road, Sector 4',
-  'Lake View Colony, Sector 7',
-  'Old Airport Junction',
-  'Harmony Colony Entrance, Ring Road',
-  'School Road, Near Government High School',
+  'Park Road, Near Central Park',
 ];
 
 const ReportIssuePage: React.FC = () => {
@@ -30,12 +30,15 @@ const ReportIssuePage: React.FC = () => {
   const { toasts, addToast, dismissToast } = useToast();
 
   const [formData, setFormData] = useState({
+    citizen_name: '',
+    phone: '',
+    email: '',
     description: '',
     location: '',
     latitude: '',
     longitude: '',
     landmark: '',
-    contactPreference: 'email',
+    contactPreference: 'phone',
     isAnonymous: false,
   });
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -58,31 +61,64 @@ const ReportIssuePage: React.FC = () => {
 
   const handleGetLocation = () => {
     setLocating(true);
-    // Simulate geolocation
-    setTimeout(() => {
-      const locations = [
-        { lat: '12.9716', lng: '77.5946', name: locationOptions[0] },
-        { lat: '12.9726', lng: '77.5956', name: locationOptions[1] },
-        { lat: '12.9746', lng: '77.5976', name: locationOptions[3] },
-      ];
-      const picked = locations[Math.floor(Math.random() * locations.length)];
-      setFormData((prev) => ({
-        ...prev,
-        latitude: picked.lat,
-        longitude: picked.lng,
-        location: picked.name,
-      }));
-      setLocating(false);
-      addToast('Location detected!', 'success');
-    }, 1500);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude.toFixed(6);
+          const lng = pos.coords.longitude.toFixed(6);
+          setFormData((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            location: prev.location || `GPS Location (${lat}, ${lng})`,
+          }));
+          setLocating(false);
+          addToast('GPS location acquired!', 'success');
+        },
+        () => {
+          // Fallback simulation
+          setTimeout(() => {
+            const picked = locationOptions[Math.floor(Math.random() * locationOptions.length)];
+            setFormData((prev) => ({
+              ...prev,
+              latitude: '16.5062',
+              longitude: '80.6480',
+              location: picked,
+            }));
+            setLocating(false);
+            addToast('Location detected successfully!', 'success');
+          }, 1000);
+        }
+      );
+    } else {
+      setTimeout(() => {
+        const picked = locationOptions[Math.floor(Math.random() * locationOptions.length)];
+        setFormData((prev) => ({
+          ...prev,
+          latitude: '16.5062',
+          longitude: '80.6480',
+          location: picked,
+        }));
+        setLocating(false);
+        addToast('Location detected!', 'success');
+      }, 1000);
+    }
   };
 
   const validate = () => {
     const errs: Record<string, string> = {};
+    if (!formData.isAnonymous) {
+      if (!formData.citizen_name.trim()) {
+        errs.citizen_name = 'Please enter your name.';
+      }
+      if (!formData.phone.trim()) {
+        errs.phone = 'Please enter your contact phone number.';
+      }
+    }
     if (!formData.description.trim()) {
       errs.description = 'Please describe the issue.';
-    } else if (formData.description.trim().length < 20) {
-      errs.description = 'Please provide a more detailed description (at least 20 characters).';
+    } else if (formData.description.trim().length < 15) {
+      errs.description = 'Please provide a clearer description (at least 15 characters).';
     }
     if (!formData.location.trim()) {
       errs.location = 'Please provide the location.';
@@ -92,20 +128,27 @@ const ReportIssuePage: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    if (!validate()) return;
+    if (!validate()) {
+      addToast('Please fill all required fields', 'error');
+      return;
+    }
 
-    // Store form data in sessionStorage for the analysis page
+    // Store in sessionStorage for the AI Analysis confirmation step
     sessionStorage.setItem(
       'pendingComplaint',
       JSON.stringify({
+        citizen_name: formData.isAnonymous ? 'Anonymous Citizen' : formData.citizen_name.trim(),
+        phone: formData.isAnonymous ? 'N/A' : formData.phone.trim(),
+        email: formData.isAnonymous ? '' : formData.email.trim(),
         description: formData.description,
         location: formData.location,
-        latitude: formData.latitude,
-        longitude: formData.longitude,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : 16.5062,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : 80.6480,
         landmark: formData.landmark,
         contactPreference: formData.contactPreference,
         isAnonymous: formData.isAnonymous,
         imageUrl,
+        imageAnalysis,
       })
     );
 
@@ -113,215 +156,205 @@ const ReportIssuePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-28 pb-12">
+    <div className="min-h-screen bg-gray-50 pt-24 pb-16">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-red-50 border border-red-100 text-red-700 text-sm font-semibold px-4 py-2 rounded-full mb-4">
-            <AlertCircle className="w-4 h-4" />
-            Report a Civic Issue
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-3">
+            <FileText className="w-3.5 h-3.5" />
+            Civic Grievance Registration
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900">
-            Describe the Problem
-          </h1>
-          <p className="text-gray-500 mt-3">
-            Our AI will analyze your report and route it to the right department automatically.
+          <h1 className="text-3xl font-extrabold text-gray-900">Report a Civic Issue</h1>
+          <p className="text-gray-600 text-sm mt-1 max-w-lg mx-auto">
+            Your complaint will be saved permanently in the central PostgreSQL database and routed directly to the responsible municipal department.
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* ── Description ──────────────────────────────────── */}
-          <div className="card">
-            <label className="label">
-              <span className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-indigo-600" />
-                Describe the Problem *
-              </span>
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              placeholder="Describe the problem in your own words…&#10;&#10;Example: There is a large pothole near the main road beside the bus stop. Vehicles are struggling to pass and it is dangerous."
-              rows={6}
-              className={`input-field resize-none ${errors.description ? 'border-red-400 ring-2 ring-red-100' : ''}`}
-            />
-            <div className="flex items-center justify-between mt-2">
-              {errors.description ? (
-                <p className="text-xs text-red-500">{errors.description}</p>
-              ) : (
-                <p className="text-xs text-gray-400">Be specific — include what, where, and since when.</p>
-              )}
-              <p className="text-xs text-gray-400">{formData.description.length} chars</p>
+        {/* Form Card */}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
+
+          {/* Section: Citizen Info */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-600" />
+                1. Citizen Details (Who is Reporting)
+              </h2>
+              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.isAnonymous}
+                  onChange={(e) => handleChange('isAnonymous', e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                />
+                Report Anonymously
+              </label>
+            </div>
+
+            {!formData.isAnonymous && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Your Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={formData.citizen_name}
+                      onChange={(e) => handleChange('citizen_name', e.target.value)}
+                      className={`input-field pl-9 text-sm ${errors.citizen_name ? 'border-red-400 bg-red-50/30' : ''}`}
+                    />
+                  </div>
+                  {errors.citizen_name && <p className="text-xs text-red-500 mt-1">{errors.citizen_name}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="tel"
+                      placeholder="e.g. 9876543210"
+                      value={formData.phone}
+                      onChange={(e) => handleChange('phone', e.target.value)}
+                      className={`input-field pl-9 text-sm ${errors.phone ? 'border-red-400 bg-red-50/30' : ''}`}
+                    />
+                  </div>
+                  {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Email Address (Optional for status updates)
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      placeholder="e.g. rahul@example.com"
+                      value={formData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                      className="input-field pl-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section: Issue Description */}
+          <div className="space-y-4 pt-2">
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-gray-100">
+              <AlertCircle className="w-4 h-4 text-indigo-600" />
+              2. Describe the Issue
+            </h2>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                What is the problem? <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={4}
+                placeholder="e.g. Street light is broken and not working near the main crossroad for 3 days. It is causing difficulty for commuters at night."
+                value={formData.description}
+                onChange={(e) => handleChange('description', e.target.value)}
+                className={`input-field resize-none text-sm ${errors.description ? 'border-red-400 bg-red-50/30' : ''}`}
+              />
+              {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
+              <p className="text-xs text-gray-400 mt-1">Our AI will automatically categorize, assign priority, and route to the appropriate department.</p>
             </div>
           </div>
 
-          {/* ── Image Upload ─────────────────────────────────── */}
-          <div className="card">
-            <label className="label flex items-center gap-2">
-              📸 Upload an Image (Optional)
+          {/* Section: Image Upload */}
+          <div className="space-y-2 pt-2">
+            <label className="block text-xs font-semibold text-gray-700">
+              Upload Photo (Optional — analyzed by Vision AI)
             </label>
             <ImageUpload onImageUploaded={handleImageUploaded} />
           </div>
 
-          {/* ── Location ─────────────────────────────────────── */}
-          <div className="card">
-            <label className="label flex items-center gap-2">
+          {/* Section: Location */}
+          <div className="space-y-4 pt-2">
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-gray-100">
               <MapPin className="w-4 h-4 text-indigo-600" />
-              Location *
-            </label>
+              3. Location Details
+            </h2>
 
-            {/* Use current location */}
-            <button
-              onClick={handleGetLocation}
-              disabled={locating}
-              className="w-full mb-4 flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-semibold py-3 rounded-xl transition-all"
-            >
-              {locating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Navigation className="w-4 h-4" />
-              )}
-              {locating ? 'Detecting location...' : 'Use Current Location'}
-            </button>
-
-            <div className="relative">
-              <p className="text-xs text-gray-400 text-center mb-4">— or enter manually —</p>
-            </div>
-
-            {/* Location search */}
-            <div className="space-y-3">
-              <div>
-                <label className="label text-xs">Location / Area Name *</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => handleChange('location', e.target.value)}
-                    placeholder="e.g. Main Road, Near Bus Stop"
-                    list="location-suggestions"
-                    className={`input-field ${errors.location ? 'border-red-400 ring-2 ring-red-100' : ''}`}
-                  />
-                  <datalist id="location-suggestions">
-                    {locationOptions.map((loc) => (
-                      <option key={loc} value={loc} />
-                    ))}
-                  </datalist>
-                </div>
-                {errors.location && (
-                  <p className="text-xs text-red-500 mt-1">{errors.location}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label text-xs">Latitude (optional)</label>
-                  <input
-                    type="text"
-                    value={formData.latitude}
-                    onChange={(e) => handleChange('latitude', e.target.value)}
-                    placeholder="12.9716"
-                    className="input-field text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="label text-xs">Longitude (optional)</label>
-                  <input
-                    type="text"
-                    value={formData.longitude}
-                    onChange={(e) => handleChange('longitude', e.target.value)}
-                    placeholder="77.5946"
-                    className="input-field text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Simulated map preview */}
-              {(formData.latitude || formData.location) && (
-                <div className="bg-gray-100 rounded-xl h-32 flex items-center justify-center border border-gray-200 relative overflow-hidden">
-                  <div className="absolute inset-0 grid-bg opacity-50" />
-                  <div className="relative flex flex-col items-center gap-2">
-                    <div className="relative">
-                      <div className="w-4 h-4 bg-red-500 rounded-full" />
-                      <div className="absolute inset-0 w-4 h-4 bg-red-400 rounded-full map-pulse" />
-                    </div>
-                    <p className="text-xs font-medium text-gray-600 bg-white px-2 py-1 rounded-full shadow-sm">
-                      📍 {formData.location || `${formData.latitude}, ${formData.longitude}`}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Optional Details ──────────────────────────────── */}
-          <div className="card">
-            <label className="label">Additional Details (Optional)</label>
-            <div className="space-y-4">
-              <div>
-                <label className="label text-xs">Nearby Landmark</label>
-                <input
-                  type="text"
-                  value={formData.landmark}
-                  onChange={(e) => handleChange('landmark', e.target.value)}
-                  placeholder="e.g. Government Engineering College"
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="label text-xs">Contact Preference</label>
-                <div className="relative">
-                  <select
-                    value={formData.contactPreference}
-                    onChange={(e) => handleChange('contactPreference', e.target.value)}
-                    className="input-field appearance-none pr-8"
-                  >
-                    <option value="email">Email notification</option>
-                    <option value="sms">SMS notification</option>
-                    <option value="none">No notification</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Anonymous toggle */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  {formData.isAnonymous ? (
-                    <EyeOff className="w-5 h-5 text-gray-500" />
-                  ) : (
-                    <Eye className="w-5 h-5 text-indigo-600" />
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Anonymous Report</p>
-                    <p className="text-xs text-gray-500">Your identity will not be shared with authorities</p>
-                  </div>
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-gray-700">
+                  Location / Address <span className="text-red-500">*</span>
+                </label>
                 <button
-                  onClick={() => handleChange('isAnonymous', !formData.isAnonymous)}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${formData.isAnonymous ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={locating}
+                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-semibold disabled:opacity-50"
                 >
-                  <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-transform ${formData.isAnonymous ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Navigation className="w-3 h-3" />}
+                  Auto-Detect GPS
                 </button>
               </div>
+
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="e.g. Main Road, Near Bus Stop, Vijayawada"
+                  value={formData.location}
+                  onChange={(e) => handleChange('location', e.target.value)}
+                  className={`input-field pl-9 text-sm ${errors.location ? 'border-red-400 bg-red-50/30' : ''}`}
+                />
+              </div>
+              {errors.location && <p className="text-xs text-red-500 mt-1">{errors.location}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Latitude</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 16.5062"
+                  value={formData.latitude}
+                  onChange={(e) => handleChange('latitude', e.target.value)}
+                  className="input-field text-xs py-1.5"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Longitude</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 80.6480"
+                  value={formData.longitude}
+                  onChange={(e) => handleChange('longitude', e.target.value)}
+                  className="input-field text-xs py-1.5"
+                />
+              </div>
             </div>
           </div>
 
-          {/* ── Submit Button ─────────────────────────────────── */}
-          <button
-            onClick={handleSubmit}
-            className="w-full btn-primary justify-center text-base py-4"
-          >
-            <span>🤖</span>
-            Analyze with CivicResolve AI
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          {/* Submit button */}
+          <div className="pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all text-base"
+            >
+              Analyze with AI & Review
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            <p className="text-center text-xs text-gray-400 mt-2 flex items-center justify-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+              Saves directly into central PostgreSQL Database
+            </p>
+          </div>
 
-          <p className="text-xs text-gray-400 text-center">
-            By submitting, you agree our AI will analyze and route your complaint to the appropriate department.
-          </p>
         </div>
       </div>
     </div>

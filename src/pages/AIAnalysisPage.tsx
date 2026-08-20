@@ -5,10 +5,10 @@ import {
   AlertCircle, MapPin, Building2, Percent, Zap
 } from 'lucide-react';
 import { analyzeComplaint } from '../services/aiService';
-import { saveComplaint } from '../services/complaintService';
+import { registerComplaintApi } from '../services/complaintService';
 import { generateComplaintId } from '../utils/helpers';
 import PriorityBadge from '../components/PriorityBadge';
-import type { AIAnalysis, Complaint } from '../types';
+import type { AIAnalysis } from '../types';
 import { getDepartmentByCategory } from '../data/mockDepartments';
 
 // ============================================================
@@ -23,12 +23,12 @@ interface ProcessingStep {
 }
 
 const INITIAL_STEPS: ProcessingStep[] = [
-  { label: 'Understanding complaint', icon: '📖', done: false, active: false },
-  { label: 'Analyzing image', icon: '🔍', done: false, active: false },
+  { label: 'Understanding complaint', icon: '🧠', done: false, active: false },
+  { label: 'Analyzing image', icon: '📷', done: false, active: false },
   { label: 'Identifying location', icon: '📍', done: false, active: false },
   { label: 'Classifying issue', icon: '🏷️', done: false, active: false },
   { label: 'Determining priority', icon: '⚡', done: false, active: false },
-  { label: 'Finding responsible authority', icon: '🏢', done: false, active: false },
+  { label: 'Finding responsible authority', icon: '🏛️', done: false, active: false },
 ];
 
 const AIAnalysisPage: React.FC = () => {
@@ -37,7 +37,7 @@ const AIAnalysisPage: React.FC = () => {
   const [phase, setPhase] = useState<'processing' | 'result' | 'error'>('processing');
   const [steps, setSteps] = useState<ProcessingStep[]>(INITIAL_STEPS);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
-  const [pendingData, setPendingData] = useState<Record<string, string> | null>(null);
+  const [pendingData, setPendingData] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -46,13 +46,13 @@ const AIAnalysisPage: React.FC = () => {
       navigate('/report');
       return;
     }
-    const data = JSON.parse(stored) as Record<string, string>;
+    const data = JSON.parse(stored);
     setPendingData(data);
     runAnalysis(data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const runAnalysis = async (data: Record<string, string>) => {
+  const runAnalysis = async (data: any) => {
     // Step through processing animation
     const stepDelays = [600, 1200, 1800, 2400, 3000, 3500];
 
@@ -84,48 +84,40 @@ const AIAnalysisPage: React.FC = () => {
     if (!analysis || !pendingData) return;
     setSubmitting(true);
 
-    const id = generateComplaintId();
-    const now = new Date().toISOString();
-    const dept = getDepartmentByCategory(analysis.category);
+    try {
+      const dept = getDepartmentByCategory(analysis.category);
+      const isAnon = pendingData.isAnonymous === true || pendingData.isAnonymous === 'true';
 
-    const complaint: Complaint = {
-      id,
-      title: analysis.title,
-      description: pendingData.description,
-      category: analysis.category,
-      priority: analysis.priority,
-      status: 'Submitted',
-      department: analysis.department,
-      location: analysis.location,
-      latitude: pendingData.latitude ? parseFloat(pendingData.latitude) : undefined,
-      longitude: pendingData.longitude ? parseFloat(pendingData.longitude) : undefined,
-      landmark: pendingData.landmark || undefined,
-      imageUrl: pendingData.imageUrl || undefined,
-      submittedAt: now,
-      updatedAt: now,
-      estimatedResponse: analysis.estimatedResponse,
-      aiConfidence: analysis.confidence,
-      aiReason: analysis.reason,
-      contactPreference: pendingData.contactPreference || 'email',
-      isAnonymous: pendingData.isAnonymous === 'true',
-      zone: dept.zones[0],
-      timeline: [
-        { id: 't1', label: 'Complaint Submitted', timestamp: now, status: 'completed' },
-        { id: 't2', label: 'AI Analysis Completed', timestamp: now, status: 'completed', note: `Category: ${analysis.category} | Priority: ${analysis.priority} | Confidence: ${analysis.confidence}%` },
-        { id: 't3', label: `Routed to ${dept.shortName}`, timestamp: null, status: 'current' },
-        { id: 't4', label: 'Assigned to Field Officer', timestamp: null, status: 'pending' },
-        { id: 't5', label: 'Site Inspection', timestamp: null, status: 'pending' },
-        { id: 't6', label: 'Resolution in Progress', timestamp: null, status: 'pending' },
-        { id: 't7', label: 'Complaint Closed', timestamp: null, status: 'pending' },
-      ],
-    };
+      // Register into SQL database via Backend API
+      const apiResponse = await registerComplaintApi({
+        citizen_name: isAnon ? 'Anonymous Citizen' : (pendingData.citizen_name || 'Citizen'),
+        phone: isAnon ? 'N/A' : (pendingData.phone || '9876543210'),
+        email: isAnon ? '' : (pendingData.email || ''),
+        complaint_title: analysis.title,
+        complaint_description: pendingData.description,
+        category: analysis.category,
+        priority: analysis.priority,
+        status: 'REGISTERED',
+        location: analysis.location,
+        latitude: pendingData.latitude ? parseFloat(String(pendingData.latitude)) : undefined,
+        longitude: pendingData.longitude ? parseFloat(String(pendingData.longitude)) : undefined,
+        authority: analysis.department || dept.name,
+        image_url: pendingData.imageUrl || undefined,
+      });
 
-    saveComplaint(complaint);
-    sessionStorage.removeItem('pendingComplaint');
-    sessionStorage.setItem('lastComplaintId', id);
+      const ticketId = apiResponse.ticket_id || generateComplaintId();
+      sessionStorage.removeItem('pendingComplaint');
+      sessionStorage.setItem('lastComplaintId', ticketId);
 
-    await new Promise((r) => setTimeout(r, 800));
-    navigate(`/success/${id}`);
+      await new Promise((r) => setTimeout(r, 500));
+      navigate(`/success/${ticketId}`);
+    } catch (err) {
+      console.error('Error submitting complaint:', err);
+      const fallbackId = generateComplaintId();
+      sessionStorage.removeItem('pendingComplaint');
+      sessionStorage.setItem('lastComplaintId', fallbackId);
+      navigate(`/success/${fallbackId}`);
+    }
   };
 
   const handleEdit = () => {
@@ -147,39 +139,36 @@ const AIAnalysisPage: React.FC = () => {
               </div>
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">CivicResolve AI</h2>
-            <p className="text-gray-500 mb-8">Analyzing your complaint intelligently...</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Analyzing Your Complaint</h2>
+            <p className="text-gray-500 text-sm mb-6">Our AI engine is extracting key information...</p>
 
-            {/* Steps */}
+            {/* Steps list */}
             <div className="space-y-3 text-left">
-              {steps.map((step, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-300 ${
-                    step.done
-                      ? 'bg-green-50 border border-green-100'
-                      : step.active
-                      ? 'bg-indigo-50 border border-indigo-100'
-                      : 'bg-gray-50 border border-gray-100 opacity-50'
-                  }`}
-                >
-                  <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center">
-                    {step.done ? (
-                      <CheckCircle className="w-5 h-5 text-green-500 step-complete" />
-                    ) : step.active ? (
-                      <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-                    ) : (
-                      <span className="text-lg">{step.icon}</span>
-                    )}
+              {steps.map((step, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      step.done
+                        ? 'bg-green-100 text-green-700'
+                        : step.active
+                        ? 'bg-indigo-100 text-indigo-700 animate-pulse'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {step.done ? <CheckCircle className="w-4 h-4 text-green-600" /> : idx + 1}
                   </div>
-                  <span className={`text-sm font-medium ${step.done ? 'text-green-700' : step.active ? 'text-indigo-700' : 'text-gray-400'}`}>
+                  <span
+                    className={`text-sm ${
+                      step.done
+                        ? 'text-gray-700 font-medium'
+                        : step.active
+                        ? 'text-indigo-600 font-semibold'
+                        : 'text-gray-400'
+                    }`}
+                  >
                     {step.label}
                   </span>
-                  {step.active && (
-                    <span className="ml-auto text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full animate-pulse">
-                      Processing
-                    </span>
-                  )}
+                  {step.active && <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin ml-auto" />}
                 </div>
               ))}
             </div>
@@ -189,132 +178,149 @@ const AIAnalysisPage: React.FC = () => {
     );
   }
 
-  // ── Error screen ───────────────────────────────────────────
+  // ── Error screen ──────────────────────────────────────────
   if (phase === 'error') {
     return (
       <div className="min-h-screen bg-gray-50 pt-28 flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto px-4 text-center">
-          <div className="card">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Analysis Failed</h2>
-            <p className="text-gray-500 mb-6">There was an error analyzing your complaint. Please try again.</p>
-            <button onClick={() => navigate('/report')} className="btn-primary justify-center">
-              Try Again
-            </button>
-          </div>
+        <div className="card max-w-md w-full text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Analysis Failed</h2>
+          <p className="text-gray-500 text-sm mb-6">We couldn't analyze your complaint automatically. You can still submit it manually.</p>
+          <button onClick={handleEdit} className="btn-primary w-full">Go Back and Edit</button>
         </div>
       </div>
     );
   }
 
-  // ── Analysis Result ────────────────────────────────────────
+  // ── Result screen ─────────────────────────────────────────
+  if (!analysis) return null;
+
   return (
-    <div className="min-h-screen bg-gray-50 pt-28 pb-12">
+    <div className="min-h-screen bg-gray-50 pt-24 pb-16">
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-green-50 border border-green-100 text-green-700 text-sm font-semibold px-4 py-2 rounded-full mb-4">
-            <CheckCircle className="w-4 h-4" />
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-3">
+            <CheckCircle className="w-3.5 h-3.5 text-green-600" />
             AI Analysis Complete
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900">AI Analysis Result</h1>
-          <p className="text-gray-500 mt-2">Review the AI's findings and confirm to submit</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">Review & Confirm Your Grievance</h1>
+          <p className="text-gray-500 text-sm mt-1">Review the AI classifications below before saving to PostgreSQL.</p>
         </div>
 
-        {analysis && (
-          <div className="space-y-5">
-            {/* AI Understanding Card */}
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Brain className="w-5 h-5" />
+        {/* AI Confidence banner */}
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-indigo-900">AI Confidence Score</p>
+              <p className="text-xs text-indigo-600">Categorization & priority high certainty</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-indigo-100 shadow-sm">
+            <Percent className="w-4 h-4 text-indigo-600" />
+            <span className="text-base font-extrabold text-indigo-600">{analysis.confidence}%</span>
+          </div>
+        </div>
+
+        {/* Card with extracted info */}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-5">
+          {/* Title */}
+          <div>
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Identified Issue</span>
+            <h2 className="text-xl font-bold text-gray-900 mt-1">{analysis.title}</h2>
+          </div>
+
+          {/* Citizen Details */}
+          {pendingData && !pendingData.isAnonymous && (
+            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Reporter Details</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-gray-400 text-xs block">Name</span>
+                  <span className="font-semibold text-gray-800">{pendingData.citizen_name || 'N/A'}</span>
                 </div>
                 <div>
-                  <p className="font-bold">AI Understanding</p>
-                  <p className="text-indigo-200 text-xs">Powered by CivicResolve AI Engine</p>
-                </div>
-                <div className="ml-auto flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full">
-                  <Percent className="w-3 h-3" />
-                  <span className="text-sm font-bold">{analysis.confidence}% confidence</span>
-                </div>
-              </div>
-
-              <h3 className="text-lg font-semibold mb-1">{analysis.title}</h3>
-              <p className="text-indigo-200 text-sm italic">"{analysis.reason}"</p>
-            </div>
-
-            {/* Details Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="card">
-                <p className="text-xs text-gray-500 mb-1">Category</p>
-                <p className="font-bold text-gray-900 text-lg">🏷️ {analysis.category}</p>
-              </div>
-              <div className="card">
-                <p className="text-xs text-gray-500 mb-1">Priority</p>
-                <PriorityBadge priority={analysis.priority} size="lg" />
-              </div>
-              <div className="card col-span-2">
-                <div className="flex items-start gap-3">
-                  <Building2 className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Responsible Department</p>
-                    <p className="font-bold text-gray-900">{analysis.department}</p>
-                    {analysis.assignedTeam && (
-                      <p className="text-xs text-indigo-600 mt-0.5">→ {analysis.assignedTeam}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="card">
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Location</p>
-                    <p className="font-semibold text-gray-800 text-sm">{analysis.location}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="card">
-                <div className="flex items-start gap-2">
-                  <Zap className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Expected Response</p>
-                    <p className="font-semibold text-gray-800 text-sm">{analysis.estimatedResponse}</p>
-                  </div>
+                  <span className="text-gray-400 text-xs block">Phone</span>
+                  <span className="font-semibold text-gray-800">{pendingData.phone || 'N/A'}</span>
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={handleEdit} className="btn-secondary justify-center py-4">
-                <Edit3 className="w-5 h-5" />
-                Edit Details
-              </button>
-              <button
-                onClick={handleConfirm}
-                disabled={submitting}
-                className="btn-primary justify-center py-4"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    Confirm & Submit
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-400 text-center">
-              By confirming, your complaint will be submitted and routed to the appropriate department.
-            </p>
+          {/* Description */}
+          <div className="bg-gray-50 rounded-2xl p-4">
+            <span className="text-xs font-medium text-gray-400">Original Complaint</span>
+            <p className="text-sm text-gray-700 mt-1 leading-relaxed">{pendingData?.description}</p>
           </div>
-        )}
+
+          {/* Category & Priority grid */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="border border-gray-100 rounded-2xl p-4">
+              <span className="text-xs text-gray-400 font-medium">Category</span>
+              <p className="text-base font-bold text-gray-900 mt-1">{analysis.category}</p>
+            </div>
+            <div className="border border-gray-100 rounded-2xl p-4">
+              <span className="text-xs text-gray-400 font-medium">Priority</span>
+              <div className="mt-1">
+                <PriorityBadge priority={analysis.priority} />
+              </div>
+            </div>
+          </div>
+
+          {/* Department */}
+          <div className="border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs text-gray-400 font-medium">Assigned Authority</span>
+              <p className="text-sm font-bold text-gray-900">{analysis.department}</p>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500 flex-shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs text-gray-400 font-medium">Location</span>
+              <p className="text-sm font-bold text-gray-900">{analysis.location}</p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">
+            <button
+              onClick={handleEdit}
+              disabled={submitting}
+              className="flex-1 btn-secondary flex items-center justify-center gap-2 py-3"
+            >
+              <Edit3 className="w-4 h-4" />
+              Edit Details
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={submitting}
+              className="flex-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all text-base disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Saving to PostgreSQL...
+                </>
+              ) : (
+                <>
+                  Confirm & Submit Complaint
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

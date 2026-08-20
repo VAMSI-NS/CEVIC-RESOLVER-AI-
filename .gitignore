@@ -3,11 +3,16 @@ node_modules/
 
 # Build output
 dist/
+dist-backend/
 
 # Environment files (keep .env.example)
 .env
 .env.local
 .env.production
+backend/.env
+
+# Local DB backup
+backend/database/local_complaints.json
 
 # Editor directories
 .vscode/
@@ -25,3 +30,5 @@ npm-debug.log*
 
 # TypeScript build info
 *.tsbuildinfo
+vite.config.d.ts
+vite.config.js
