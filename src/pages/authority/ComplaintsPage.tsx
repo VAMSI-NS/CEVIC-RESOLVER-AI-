@@ -1,39 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Search, Filter, Eye, RefreshCw, CheckCircle2, Clock,
-  MapPin, User, Phone, Mail, Building2, Tag, Zap, AlertCircle,
-  X, ArrowRight, Shield, Sparkles, Check, ChevronDown, Compass
+  Search, Filter, RefreshCw, Eye, CheckCircle2, Clock,
+  MapPin, AlertCircle, X, Check, ArrowRight, ShieldCheck,
+  User, Phone, Mail, Calendar, Building2, Tag, Zap, Loader2
 } from 'lucide-react';
-import { fetchAllComplaintsApi, updateComplaintStatusApi } from '../../services/complaintService';
-import type { Complaint, Category, Priority, ComplaintStatus } from '../../types';
-
-const allStatuses: ComplaintStatus[] = [
-  'REGISTERED',
-  'UNDER_REVIEW',
-  'ASSIGNED',
-  'IN_PROGRESS',
-  'RESOLVED',
-  'REJECTED',
-];
+import {
+  fetchAllComplaintsApi,
+  updateComplaintStatusApi,
+} from '../../services/complaintService';
+import StatusBadge from '../../components/StatusBadge';
+import PriorityBadge from '../../components/PriorityBadge';
+import { ToastContainer, useToast } from '../../components/Toast';
+import type { Complaint, ComplaintStatus } from '../../types';
 
 const ComplaintsPage: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const { toasts, addToast, dismissToast } = useToast();
 
   const loadComplaints = async () => {
+    setLoading(true);
     try {
       const data = await fetchAllComplaintsApi();
-      setComplaints(data);
+      if (Array.isArray(data)) {
+        setComplaints(data);
+      }
     } catch {
-      // Fallback
+      addToast('Failed to load complaints from database', 'error');
     } finally {
       setLoading(false);
     }
@@ -41,456 +40,318 @@ const ComplaintsPage: React.FC = () => {
 
   useEffect(() => {
     loadComplaints();
+    const interval = setInterval(loadComplaints, 12000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Auto-refresh interval (12 seconds)
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(() => {
-      loadComplaints();
-    }, 12000);
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const handleStatusChange = async (newStatus: string) => {
-    if (!selectedComplaint) return;
-    setUpdatingStatus(true);
-    const targetId = selectedComplaint.ticket_id || selectedComplaint.id;
-
+  const handleStatusChange = async (complaintId: string | number, newStatus: ComplaintStatus) => {
+    setUpdatingId(String(complaintId));
     try {
-      const updated = await updateComplaintStatusApi(targetId, newStatus);
-      if (updated) {
-        setSelectedComplaint(updated);
+      const success = await updateComplaintStatusApi(String(complaintId), newStatus);
+      if (success) {
         setComplaints((prev) =>
-          prev.map((c) => ((c.ticket_id || c.id) === targetId ? updated : c))
+          prev.map((c) => (String(c.id) === String(complaintId) || c.ticket_id === String(complaintId) ? { ...c, status: newStatus } : c))
         );
-        setActionSuccess(`Status updated to ${newStatus} in PostgreSQL!`);
-        setTimeout(() => setActionSuccess(null), 3000);
+        if (selectedComplaint && (String(selectedComplaint.id) === String(complaintId) || selectedComplaint.ticket_id === String(complaintId))) {
+          setSelectedComplaint((prev) => (prev ? { ...prev, status: newStatus } : null));
+        }
+        addToast(`Ticket status updated to ${newStatus} in PostgreSQL!`, 'success');
+      } else {
+        addToast('Failed to update status in database', 'error');
       }
     } catch {
-      alert('Failed to update status in database. Please retry.');
+      addToast('Database update error', 'error');
     } finally {
-      setUpdatingStatus(false);
+      setUpdatingId(null);
     }
   };
 
   // Filter complaints
   const filtered = complaints.filter((c) => {
-    const term = searchTerm.toLowerCase();
+    const term = search.toLowerCase();
     const matchesSearch =
-      !term ||
+      !search ||
       c.title.toLowerCase().includes(term) ||
-      (c.ticket_id || c.id).toLowerCase().includes(term) ||
-      (c.citizen_name || c.citizenName || '').toLowerCase().includes(term) ||
-      (c.phone || '').toLowerCase().includes(term) ||
-      (c.email || '').toLowerCase().includes(term) ||
+      (c.ticket_id && c.ticket_id.toLowerCase().includes(term)) ||
+      (c.citizenName && c.citizenName.toLowerCase().includes(term)) ||
       c.location.toLowerCase().includes(term);
 
-    const matchesCategory = categoryFilter === 'ALL' || c.category === categoryFilter;
-    const matchesPriority = priorityFilter === 'ALL' || c.priority === priorityFilter;
     const matchesStatus =
       statusFilter === 'ALL' ||
-      c.status.toUpperCase().replace(/[\s-]/g, '_') === statusFilter.toUpperCase().replace(/[\s-]/g, '_');
+      c.status.toUpperCase().replace(/[\s-]/g, '_') === statusFilter.toUpperCase();
 
-    return matchesSearch && matchesCategory && matchesPriority && matchesStatus;
+    const matchesCategory =
+      categoryFilter === 'ALL' ||
+      c.category.toLowerCase() === categoryFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const getStatusBadge = (status: string) => {
-    const s = (status || 'REGISTERED').toUpperCase().replace(/[\s-]/g, '_');
-    if (s.includes('RESOLV')) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
-    if (s.includes('PROGRESS')) return 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30';
-    if (s.includes('ASSIGN')) return 'bg-purple-500/10 text-purple-300 border-purple-500/30';
-    if (s.includes('REVIEW')) return 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30';
-    if (s.includes('REJECT')) return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
-    return 'bg-amber-500/10 text-amber-300 border-amber-500/30';
-  };
-
-  const getPriorityBadge = (p: string) => {
-    switch (p) {
-      case 'CRITICAL': return 'bg-rose-500/15 text-rose-400 border-rose-500/30';
-      case 'HIGH': return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
-      case 'MEDIUM': return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
-      default: return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
-    }
-  };
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      
-      {/* Top Header */}
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Title & Stats Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">
-            PostgreSQL Central Database Table
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-0.5">
-            Complaints Management Table
-          </h1>
-          <p className="text-xs text-slate-400">
-            Inspect, search, and update resolution lifecycle of all registered citizen grievances
+          <h2 className="text-2xl font-black text-slate-900 font-display">
+            Complaints Management
+          </h2>
+          <p className="text-xs text-slate-500">
+            Real-time grievance stream synced directly with Neon PostgreSQL database
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-slate-400 bg-white/[0.04] border border-white/[0.08] px-3 py-2 rounded-xl cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded bg-[#07111F] text-cyan-500"
-            />
-            <span>Auto-Refresh (12s)</span>
-          </label>
+        <button
+          onClick={loadComplaints}
+          disabled={loading}
+          className="btn-secondary text-xs py-2 px-3.5 self-start sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh Table</span>
+        </button>
+      </div>
 
-          <button
-            onClick={loadComplaints}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold shadow-glow-cyan transition-all cursor-pointer"
+      {/* Filters Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 w-full">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by ticket ID, citizen name, issue or location..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-semibold focus:outline-none w-full md:w-auto"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Sync PostgreSQL</span>
-          </button>
+            <option value="ALL">All Statuses</option>
+            <option value="REGISTERED">Registered</option>
+            <option value="UNDER_REVIEW">Under Review</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="RESOLVED">Resolved</option>
+          </select>
+
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-semibold focus:outline-none w-full md:w-auto"
+          >
+            <option value="ALL">All Categories</option>
+            <option value="Roads">Roads & Potholes</option>
+            <option value="Streetlights">Street Lights</option>
+            <option value="Garbage">Waste Management</option>
+            <option value="Water">Water Supply</option>
+            <option value="Drainage">Drainage & Sewage</option>
+          </select>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="glass-panel p-4 space-y-4 border-white/[0.08]">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          
-          {/* Universal Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search Ticket, Citizen, Phone, Location..."
-              className="glass-input pl-10 text-xs py-2.5"
-            />
-          </div>
-
-          {/* Category Filter */}
-          <div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="glass-input text-xs py-2.5"
-            >
-              <option value="ALL" className="bg-[#07111F]">All Categories</option>
-              <option value="Roads" className="bg-[#07111F]">Roads & Potholes</option>
-              <option value="Streetlights" className="bg-[#07111F]">Streetlights & Power</option>
-              <option value="Garbage" className="bg-[#07111F]">Garbage & Waste</option>
-              <option value="Water" className="bg-[#07111F]">Water Supply</option>
-              <option value="Drainage" className="bg-[#07111F]">Drainage & Sewage</option>
-              <option value="Infrastructure" className="bg-[#07111F]">Infrastructure</option>
-            </select>
-          </div>
-
-          {/* Priority Filter */}
-          <div>
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="glass-input text-xs py-2.5"
-            >
-              <option value="ALL" className="bg-[#07111F]">All Priorities</option>
-              <option value="CRITICAL" className="bg-[#07111F]">CRITICAL</option>
-              <option value="HIGH" className="bg-[#07111F]">HIGH</option>
-              <option value="MEDIUM" className="bg-[#07111F]">MEDIUM</option>
-              <option value="LOW" className="bg-[#07111F]">LOW</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="glass-input text-xs py-2.5"
-            >
-              <option value="ALL" className="bg-[#07111F]">All Statuses</option>
-              <option value="REGISTERED" className="bg-[#07111F]">REGISTERED</option>
-              <option value="UNDER_REVIEW" className="bg-[#07111F]">UNDER REVIEW</option>
-              <option value="ASSIGNED" className="bg-[#07111F]">ASSIGNED</option>
-              <option value="IN_PROGRESS" className="bg-[#07111F]">IN PROGRESS</option>
-              <option value="RESOLVED" className="bg-[#07111F]">RESOLVED</option>
-              <option value="REJECTED" className="bg-[#07111F]">REJECTED</option>
-            </select>
-          </div>
-
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-white/[0.04]">
-          <span>Showing <strong className="text-white">{filtered.length}</strong> of {complaints.length} complaints</span>
-          {(searchTerm || categoryFilter !== 'ALL' || priorityFilter !== 'ALL' || statusFilter !== 'ALL') && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setCategoryFilter('ALL');
-                setPriorityFilter('ALL');
-                setStatusFilter('ALL');
-              }}
-              className="text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
-            >
-              Reset Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Complaints Table */}
-      <div className="glass-panel overflow-hidden border-white/[0.08]">
+      {/* Main Table */}
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-premium">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            
-            {/* Table Header */}
-            <thead className="bg-[#07111F] text-slate-400 font-mono uppercase tracking-wider border-b border-white/[0.08]">
-              <tr>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-mono text-[11px] uppercase tracking-wider">
                 <th className="py-3.5 px-4 font-bold">Ticket ID</th>
                 <th className="py-3.5 px-4 font-bold">Citizen</th>
-                <th className="py-3.5 px-4 font-bold">Issue / Title</th>
+                <th className="py-3.5 px-4 font-bold">Issue Title</th>
                 <th className="py-3.5 px-4 font-bold">Category</th>
                 <th className="py-3.5 px-4 font-bold">Priority</th>
                 <th className="py-3.5 px-4 font-bold">Location</th>
                 <th className="py-3.5 px-4 font-bold">Status</th>
-                <th className="py-3.5 px-4 font-bold">Date</th>
-                <th className="py-3.5 px-4 font-bold text-center">Action</th>
+                <th className="py-3.5 px-4 font-bold text-right">Action</th>
               </tr>
             </thead>
 
-            {/* Table Body */}
-            <tbody className="divide-y divide-white/[0.04] text-slate-300">
-              {filtered.map((c) => {
-                const ticketId = c.ticket_id || c.id;
-                const citizenName = c.citizen_name || c.citizenName || 'Citizen';
-                const dateFormatted = c.submittedAt ? new Date(c.submittedAt).toLocaleDateString() : 'Recent';
-
-                return (
-                  <tr key={c.id} className="hover:bg-white/[0.03] transition-colors">
-                    
-                    {/* Ticket ID */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-cyan-300 whitespace-nowrap">
-                      {ticketId}
+            <tbody className="divide-y divide-slate-100">
+              {loading && complaints.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
+                    <span>Loading database records...</span>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-500">
+                    No matching complaints found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
+                      {c.ticket_id || c.id}
                     </td>
-
-                    {/* Citizen */}
-                    <td className="py-3.5 px-4 font-medium text-white whitespace-nowrap">
-                      <div>{citizenName}</div>
-                      {c.phone && <div className="text-[10px] text-slate-500 font-mono">{c.phone}</div>}
+                    <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800">
+                      {c.citizenName || 'Citizen'}
                     </td>
-
-                    {/* Issue Title */}
-                    <td className="py-3.5 px-4 max-w-[200px] truncate font-medium">
+                    <td className="py-3.5 px-4 max-w-xs font-semibold text-slate-900 truncate">
                       {c.title}
                     </td>
-
-                    {/* Category */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/[0.04] border border-white/[0.08] text-slate-300">
-                        {c.category}
-                      </span>
+                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 font-medium">
+                      {c.category}
                     </td>
-
-                    {/* Priority */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${getPriorityBadge(c.priority)}`}>
-                        {c.priority}
-                      </span>
+                      <PriorityBadge priority={c.priority} size="sm" />
                     </td>
-
-                    {/* Location */}
-                    <td className="py-3.5 px-4 max-w-[160px] truncate text-slate-400">
+                    <td className="py-3.5 px-4 max-w-[180px] text-slate-500 truncate">
                       {c.location}
                     </td>
-
-                    {/* Status */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(c.status)}`}>
-                        {c.status}
-                      </span>
+                      <StatusBadge status={c.status} size="sm" />
                     </td>
-
-                    {/* Date */}
-                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
-                      {dateFormatted}
-                    </td>
-
-                    {/* Action: View Modal */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <button
                         onClick={() => setSelectedComplaint(c)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all hover:scale-105 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold transition-colors cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>View</span>
                       </button>
                     </td>
-
                   </tr>
-                );
-              })}
+                ))
+              )}
             </tbody>
-
           </table>
         </div>
       </div>
 
-      {/* ============================================================
-          VIEW BREAKDOWN MODAL (4 Explicit Sections)
-         ============================================================ */}
+      {/* 4-Section Complaint View/Update Modal */}
       {selectedComplaint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-[#07111F] border border-white/[0.12] rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 p-6 sm:p-8 animate-in zoom-in-95 duration-200 relative">
-            
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh]"
+          >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-violet-600 flex items-center justify-center shadow-glow-cyan">
-                  <Shield className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                    Grievance Detail Blueprint
-                  </span>
-                  <h2 className="text-lg font-bold text-white font-display">
-                    Ticket: {selectedComplaint.ticket_id || selectedComplaint.id}
-                  </h2>
-                </div>
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase text-slate-500">Complaint Details</span>
+                <h3 className="text-base font-extrabold text-slate-900 font-display">
+                  {selectedComplaint.ticket_id || selectedComplaint.id}
+                </h3>
               </div>
-
               <button
                 onClick={() => setSelectedComplaint(null)}
-                className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.10] text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Action Success Alert */}
-            {actionSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{actionSuccess}</span>
-              </div>
-            )}
-
-            {/* Section 1: WHO REPORTED */}
-            <div className="bg-[#0B1625]/70 border border-white/[0.06] rounded-2xl p-4 space-y-2">
-              <span className="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" /> 1. Who Reported
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
-                <div>
-                  <span className="text-slate-500">Citizen Name:</span>
-                  <p className="font-bold text-white mt-0.5">{selectedComplaint.citizen_name || selectedComplaint.citizenName || 'Citizen'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Phone Number:</span>
-                  <p className="font-mono text-slate-300 mt-0.5">{selectedComplaint.phone || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Email Address:</span>
-                  <p className="text-slate-300 truncate mt-0.5">{selectedComplaint.email || 'Not provided'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 2: COMPLAINT DETAILS */}
-            <div className="bg-[#0B1625]/70 border border-white/[0.06] rounded-2xl p-4 space-y-2">
-              <span className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5" /> 2. Complaint Details
-              </span>
-              <div className="space-y-2 text-xs pt-1">
-                <div>
-                  <span className="text-slate-500">Title:</span>
-                  <p className="font-bold text-white mt-0.5">{selectedComplaint.title}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Description:</span>
-                  <p className="text-slate-300 mt-0.5 leading-relaxed bg-[#07111F] p-3 rounded-xl border border-white/[0.04]">
-                    {selectedComplaint.description}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 pt-1">
+            {/* Modal Scroll Content */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-700">
+              
+              {/* Section 1: WHO REPORTED */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                <p className="font-mono font-bold text-slate-900 uppercase text-[11px]">1. Citizen Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-600">
                   <div>
-                    <span className="text-slate-500">Category:</span>
-                    <p className="font-bold text-white mt-0.5">{selectedComplaint.category}</p>
+                    <span className="text-slate-400 block text-[10px]">Name</span>
+                    <span className="font-bold text-slate-900">{selectedComplaint.citizenName || 'Citizen'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500">Priority:</span>
-                    <p className="font-mono font-bold text-amber-400 mt-0.5">{selectedComplaint.priority}</p>
+                    <span className="text-slate-400 block text-[10px]">Phone</span>
+                    <span className="font-mono">{selectedComplaint.phone || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Email</span>
+                    <span className="font-mono truncate block">{selectedComplaint.email || 'N/A'}</span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Section 3: LOCATION */}
-            <div className="bg-[#0B1625]/70 border border-white/[0.06] rounded-2xl p-4 space-y-2">
-              <span className="text-xs font-mono font-bold text-violet-300 uppercase tracking-wider flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" /> 3. Location & GPS
-              </span>
-              <div className="text-xs pt-1 space-y-1.5">
-                <p className="text-white font-medium">{selectedComplaint.location}</p>
-                {(selectedComplaint.latitude || selectedComplaint.longitude) && (
-                  <p className="font-mono text-cyan-300 text-[11px] flex items-center gap-1">
-                    <Compass className="w-3 h-3" />
-                    <span>Coordinates: {selectedComplaint.latitude}, {selectedComplaint.longitude}</span>
+              {/* Section 2: COMPLAINT DETAILS */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                <p className="font-mono font-bold text-slate-900 uppercase text-[11px]">2. Complaint Summary</p>
+                <p className="font-bold text-sm text-slate-900">{selectedComplaint.title}</p>
+                <p className="leading-relaxed text-slate-600">{selectedComplaint.description}</p>
+                
+                <div className="flex items-center gap-3 pt-2">
+                  <span className="bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-slate-700 font-semibold">
+                    🏷️ {selectedComplaint.category}
+                  </span>
+                  <PriorityBadge priority={selectedComplaint.priority} size="sm" />
+                </div>
+              </div>
+
+              {/* Section 3: LOCATION */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                <p className="font-mono font-bold text-slate-900 uppercase text-[11px]">3. Location & Authority</p>
+                <p className="flex items-center gap-1.5 text-slate-800 font-semibold">
+                  <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                  <span>{selectedComplaint.location}</span>
+                </p>
+                {selectedComplaint.department && (
+                  <p className="text-blue-700 font-medium flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Assigned: {selectedComplaint.department}</span>
                   </p>
                 )}
               </div>
-            </div>
 
-            {/* Section 4: MANAGEMENT & STATUS UPDATE */}
-            <div className="bg-[#0B1625]/90 border border-cyan-500/30 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
-                <span className="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5" /> 4. Management & Status Updater
-                </span>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(selectedComplaint.status)}`}>
-                  Current: {selectedComplaint.status}
-                </span>
-              </div>
+              {/* Section 4: STATUS UPDATER */}
+              <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono font-bold text-blue-900 uppercase text-[11px]">4. Change Status in Neon PostgreSQL</p>
+                  <StatusBadge status={selectedComplaint.status} size="sm" />
+                </div>
 
-              <div className="space-y-2 text-xs">
-                <p className="text-slate-400">
-                  <span className="text-slate-500">Assigned Authority: </span>
-                  <strong className="text-white">{selectedComplaint.department || 'Municipal Authority'}</strong>
-                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  <button
+                    onClick={() => handleStatusChange(selectedComplaint.id, 'UNDER_REVIEW')}
+                    disabled={updatingId !== null}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors"
+                  >
+                    Set Under Review
+                  </button>
 
-                <p className="text-slate-400 text-[11px]">
-                  Click any status button below to update PostgreSQL in real time:
-                </p>
+                  <button
+                    onClick={() => handleStatusChange(selectedComplaint.id, 'ASSIGNED')}
+                    disabled={updatingId !== null}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 transition-colors"
+                  >
+                    Set Assigned
+                  </button>
 
-                {/* Instant Status Changer Buttons */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-                  {allStatuses.map((st) => {
-                    const isCurrent = (selectedComplaint.status || '').toUpperCase() === st.toUpperCase();
-                    return (
-                      <button
-                        key={st}
-                        onClick={() => handleStatusChange(st)}
-                        disabled={updatingStatus || isCurrent}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                          isCurrent
-                            ? 'bg-cyan-500 text-[#050B14] shadow-glow-cyan'
-                            : 'bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.08] text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        {isCurrent && <Check className="w-3.5 h-3.5" />}
-                        <span>{st.replace('_', ' ')}</span>
-                      </button>
-                    );
-                  })}
+                  <button
+                    onClick={() => handleStatusChange(selectedComplaint.id, 'IN_PROGRESS')}
+                    disabled={updatingId !== null}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
+                  >
+                    Set In Progress
+                  </button>
+
+                  <button
+                    onClick={() => handleStatusChange(selectedComplaint.id, 'RESOLVED')}
+                    disabled={updatingId !== null}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors"
+                  >
+                    Set Resolved ✓
+                  </button>
                 </div>
               </div>
+
             </div>
 
-            {/* Modal Close Button */}
-            <div className="pt-2 flex justify-end">
+            {/* Modal Footer */}
+            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex justify-end">
               <button
                 onClick={() => setSelectedComplaint(null)}
-                className="px-6 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.10] text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                className="btn-secondary text-xs py-2 px-4"
               >
-                Close Modal
+                Close View
               </button>
             </div>
 

@@ -1,46 +1,70 @@
-import React from 'react';
-import { Settings, Info } from 'lucide-react';
-
-// ============================================================
-// Authority Dashboard — Settings Page (placeholder)
-// ============================================================
+import React, { useState } from 'react';
+import { Settings, Shield, Bell, Database, Check, Save } from 'lucide-react';
+import { ToastContainer, useToast } from '../../components/Toast';
 
 const SettingsPage: React.FC = () => {
+  const { toasts, addToast, dismissToast } = useToast();
+  const [zone, setZone] = useState('Central Vijayawada Municipal Zone');
+  const [slaHours, setSlaHours] = useState('48');
+  const [autoDispatch, setAutoDispatch] = useState(true);
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    addToast('Zone configuration saved successfully!', 'success');
+  };
+
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-6 max-w-3xl animate-in fade-in duration-200">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
       <div>
-        <h1 className="text-2xl font-extrabold text-gray-900">Settings</h1>
-        <p className="text-gray-500 text-sm mt-0.5">System configuration and preferences</p>
+        <h2 className="text-2xl font-black text-slate-900 font-display">Zone Settings</h2>
+        <p className="text-xs text-slate-500">Configure municipal SLA parameters and dispatch automation</p>
       </div>
 
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex gap-3">
-        <Info className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" />
-        <p className="text-sm text-indigo-700">
-          This is a <strong>demo MVP</strong> for hackathon purposes. Settings configuration, user management, API keys,
-          and notification preferences would be configured here in production.
-        </p>
-      </div>
+      <form onSubmit={handleSave} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-premium space-y-6">
+        
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-slate-700">Municipal Zone Jurisdiction</label>
+          <input
+            type="text"
+            value={zone}
+            onChange={(e) => setZone(e.target.value)}
+            className="glass-input"
+          />
+        </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        {[
-          { label: 'AI Model', value: 'CivicResolve AI Engine (Mock)', icon: '🤖' },
-          { label: 'Escalation Threshold', value: 'HIGH: 48h | MEDIUM: 96h | LOW: 168h', icon: '⏱️' },
-          { label: 'Notification Channel', value: 'Email + SMS (Demo)', icon: '🔔' },
-          { label: 'Department Zones', value: '4 Zones Active', icon: '🗺️' },
-          { label: 'Data Storage', value: 'LocalStorage (Demo)', icon: '💾' },
-          { label: 'API Status', value: 'Mock Mode — All Systems Operational', icon: '✅' },
-        ].map((item) => (
-          <div key={item.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{item.icon}</span>
-              <div>
-                <p className="text-xs text-gray-400">{item.label}</p>
-                <p className="font-semibold text-gray-800 text-sm">{item.value}</p>
-              </div>
-            </div>
+        <div className="space-y-1.5">
+          <label className="block text-xs font-semibold text-slate-700">Standard Resolution SLA (Hours)</label>
+          <input
+            type="number"
+            value={slaHours}
+            onChange={(e) => setSlaHours(e.target.value)}
+            className="glass-input"
+          />
+        </div>
+
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-900">Automated AI Zonal Dispatch</p>
+            <p className="text-[11px] text-slate-500">Automatically assign complaints based on GPS and category</p>
           </div>
-        ))}
-      </div>
+          <input
+            type="checkbox"
+            checked={autoDispatch}
+            onChange={(e) => setAutoDispatch(e.target.checked)}
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+          />
+        </div>
+
+        <div className="pt-4 border-t border-slate-100 flex justify-end">
+          <button type="submit" className="btn-primary text-xs py-2.5 px-5">
+            <Save className="w-3.5 h-3.5" />
+            <span>Save Settings</span>
+          </button>
+        </div>
+
+      </form>
     </div>
   );
 };

@@ -1,29 +1,39 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Database } from 'lucide-react';
+import { Sparkles, Shield, X, ArrowUpRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const DemoBanner: React.FC = () => {
-  const [dismissed, setDismissed] = useState(false);
+  const [visible, setVisible] = useState(true);
 
-  if (dismissed) return null;
+  if (!visible) return null;
 
   return (
-    <div
-      id="demo-banner"
-      role="status"
-      className="fixed top-0 left-0 right-0 z-[60] bg-[#07111F]/90 border-b border-cyan-500/20 backdrop-blur-md py-1.5 px-4 flex items-center justify-center gap-2 text-xs text-slate-300"
-    >
-      <Database className="w-3.5 h-3.5 flex-shrink-0 text-cyan-400" aria-hidden="true" />
-      <span className="text-center font-mono">
-        <strong className="text-cyan-300">Live Smart City Network</strong> — Real-time AI routing & PostgreSQL cloud synchronization active.
-      </span>
-      <button
-        onClick={() => setDismissed(true)}
-        className="ml-2 p-1 rounded-lg hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
-        aria-label="Dismiss banner"
-      >
-        <X className="w-3 h-3" />
-      </button>
-    </div>
+    <aside aria-label="Cloud sync indicator banner" className="bg-gradient-to-r from-blue-50 via-indigo-50 to-cyan-50 border-b border-blue-100 text-slate-700 text-xs py-2 px-4 relative z-40">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+          <span className="font-semibold text-slate-900">CivicResolve AI</span>
+          <span className="hidden sm:inline text-slate-500">• Live PostgreSQL Cloud Sync Active</span>
+        </div>
+
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <Link
+            to="/admin"
+            className="font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 hover:underline"
+          >
+            <span>Authority Portal</span>
+            <ArrowUpRight className="w-3 h-3" />
+          </Link>
+          <button
+            onClick={() => setVisible(false)}
+            className="text-slate-400 hover:text-slate-700 p-0.5 rounded transition-colors"
+            aria-label="Dismiss banner"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 };
 

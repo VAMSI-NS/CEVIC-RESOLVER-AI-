@@ -137,48 +137,44 @@ const ReportIssuePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050B14] text-[#F8FAFC] pt-28 pb-20 smart-city-grid relative">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] pt-28 pb-20 smart-city-light-grid relative">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-
-      {/* Ambient background glows */}
-      <div className="absolute top-20 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 right-10 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 relative z-10">
         
         {/* Header */}
         <div className="text-center mb-10 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold font-mono">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold font-mono">
             <Sparkles className="w-3.5 h-3.5" />
             <span>AI-POWERED INTAKE</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white font-display">
-            Report a <span className="gradient-text-cyan-violet">Civic Issue</span>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 font-display">
+            Report a <span className="gradient-text-blue-cyan">Civic Issue</span>
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto">
-            Help improve your community by reporting a problem. Our AI will classify the severity and route it instantly.
+          <p className="text-slate-600 text-sm sm:text-base max-w-lg mx-auto">
+            Your report helps make your community better. Our AI will classify the severity and route it instantly.
           </p>
         </div>
 
         {/* Main Form Glass Card */}
-        <form onSubmit={handleSubmit} className="glass-panel p-6 sm:p-10 space-y-8 border-white/[0.10]">
+        <form onSubmit={handleSubmit} className="glass-panel p-6 sm:p-10 space-y-8 bg-white border-slate-200 shadow-premium">
 
           {/* Section 1: Citizen Identity */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <User className="w-4 h-4 text-cyan-400" />
-                <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                <User className="w-4 h-4 text-blue-600" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider font-mono">
                   1. Citizen Contact Information
                 </h2>
               </div>
               
-              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer hover:text-white">
+              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer hover:text-slate-900">
                 <input
                   type="checkbox"
                   checked={formData.isAnonymous}
                   onChange={(e) => handleChange('isAnonymous', e.target.checked)}
-                  className="rounded bg-[#07111F] border-white/20 text-cyan-500 focus:ring-cyan-400"
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span>Report Anonymously</span>
               </label>
@@ -187,8 +183,8 @@ const ReportIssuePage: React.FC = () => {
             {!formData.isAnonymous && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Your Full Name <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Your Full Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -198,14 +194,14 @@ const ReportIssuePage: React.FC = () => {
                     className="glass-input"
                   />
                   {errors.citizen_name && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+                    <p className="text-rose-500 text-xs mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> {errors.citizen_name}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-300">
+                  <label className="block text-xs font-semibold text-slate-700">
                     Phone Number
                   </label>
                   <input
@@ -216,12 +212,12 @@ const ReportIssuePage: React.FC = () => {
                     className="glass-input"
                   />
                   {errors.phone && (
-                    <p className="text-rose-400 text-xs mt-1">{errors.phone}</p>
+                    <p className="text-rose-500 text-xs mt-1">{errors.phone}</p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-300">
+                  <label className="block text-xs font-semibold text-slate-700">
                     Email Address
                   </label>
                   <input
@@ -232,7 +228,7 @@ const ReportIssuePage: React.FC = () => {
                     className="glass-input"
                   />
                   {errors.email && (
-                    <p className="text-rose-400 text-xs mt-1">{errors.email}</p>
+                    <p className="text-rose-500 text-xs mt-1">{errors.email}</p>
                   )}
                 </div>
               </div>
@@ -241,10 +237,10 @@ const ReportIssuePage: React.FC = () => {
 
           {/* Section 2: Issue Description */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2.5 border-b border-white/[0.08] pb-3">
-              <FileText className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                2. Issue Description & Details <span className="text-rose-400">*</span>
+            <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+              <FileText className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider font-mono">
+                2. Issue Description & Details <span className="text-rose-500">*</span>
               </h2>
             </div>
 
@@ -257,7 +253,7 @@ const ReportIssuePage: React.FC = () => {
                 className="glass-input resize-none"
               />
               {errors.description && (
-                <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+                <p className="text-rose-500 text-xs mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> {errors.description}
                 </p>
               )}
@@ -265,8 +261,8 @@ const ReportIssuePage: React.FC = () => {
 
             {/* Photo Upload */}
             <div className="pt-2">
-              <label className="block text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-                <Camera className="w-3.5 h-3.5 text-slate-400" />
+              <label className="block text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-slate-500" />
                 <span>Attach Photo (Optional)</span>
               </label>
               <ImageUpload
@@ -283,11 +279,11 @@ const ReportIssuePage: React.FC = () => {
 
           {/* Section 3: Location */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <MapPin className="w-4 h-4 text-violet-400" />
-                <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                  3. Location & GPS <span className="text-rose-400">*</span>
+                <MapPin className="w-4 h-4 text-violet-600" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider font-mono">
+                  3. Location & GPS <span className="text-rose-500">*</span>
                 </h2>
               </div>
 
@@ -295,7 +291,7 @@ const ReportIssuePage: React.FC = () => {
                 type="button"
                 onClick={handleGetLocation}
                 disabled={locating}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-cyan-300 hover:text-cyan-200 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-sm"
               >
                 {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Navigation className="w-3.5 h-3.5" />}
                 <span>Auto-Detect GPS</span>
@@ -318,15 +314,15 @@ const ReportIssuePage: React.FC = () => {
                   ))}
                 </datalist>
                 {errors.location && (
-                  <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+                  <p className="text-rose-500 text-xs mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" /> {errors.location}
                   </p>
                 )}
               </div>
 
               {(formData.latitude || formData.longitude) && (
-                <div className="flex items-center gap-3 text-xs font-mono text-cyan-300 bg-cyan-950/30 border border-cyan-500/20 px-3.5 py-2 rounded-xl">
-                  <Compass className="w-4 h-4 text-cyan-400" />
+                <div className="flex items-center gap-3 text-xs font-mono text-blue-700 bg-blue-50 border border-blue-200 px-3.5 py-2 rounded-xl">
+                  <Compass className="w-4 h-4 text-blue-600" />
                   <span>GPS Coordinates: {formData.latitude}, {formData.longitude}</span>
                 </div>
               )}
@@ -334,14 +330,14 @@ const ReportIssuePage: React.FC = () => {
           </div>
 
           {/* Submit Action */}
-          <div className="pt-6 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-slate-400">
-              âš¡ Next: Our AI will inspect your report and select the department.
+          <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-500">
+              ⚡ Next: Our AI will inspect your report and select the department.
             </p>
 
             <button
               type="submit"
-              className="w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 shadow-glow-cyan transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 shadow-md shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Analyze with AI & Review</span>
               <ArrowRight className="w-4 h-4" />

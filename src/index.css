@@ -12,20 +12,19 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
-    background-color: #050B14;
-    color: #F8FAFC;
+    background-color: #F8FAFC;
+    color: #0F172A;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
     overflow-x: hidden;
   }
 
-  /* Accessible focus styles */
   :focus-visible {
-    outline: 2px solid #22D3EE;
+    outline: 2px solid #2563EB;
     outline-offset: 2px;
     border-radius: 8px;
   }
@@ -35,121 +34,112 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', 'Inter', sans-serif;
-    letter-spacing: -0.02em;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    letter-spacing: -0.025em;
+    color: #0F172A;
   }
 }
 
 @layer components {
-  /* Futuristic Gradient Buttons */
+  /* Apple/Stripe style Premium Buttons */
   .btn-primary {
-    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-sm text-white bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 hover:from-cyan-400 hover:via-indigo-400 hover:to-violet-500 shadow-glow-cyan hover:shadow-glow-mixed transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050B14] cursor-pointer;
+    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-700 hover:via-indigo-700 hover:to-cyan-600 shadow-md hover:shadow-glow-blue transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 cursor-pointer;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-sm text-slate-200 bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.12] hover:border-cyan-400/50 backdrop-blur-md transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-sm hover:shadow-glow-cyan focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050B14] cursor-pointer;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-sm text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer;
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-sm text-white bg-rose-600 hover:bg-rose-500 shadow-md hover:shadow-rose-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-rose-500 cursor-pointer;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-semibold text-sm text-white bg-rose-600 hover:bg-rose-500 shadow-sm hover:shadow-rose-500/20 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer;
   }
 
-  /* Glassmorphic Surfaces */
+  /* Light Glassmorphism Surfaces */
   .glass-panel {
-    @apply bg-[#07111F]/70 border border-white/[0.08] backdrop-blur-xl rounded-3xl shadow-glass;
+    @apply bg-white/80 border border-slate-200/80 backdrop-blur-xl rounded-3xl shadow-premium;
   }
 
   .glass-card {
-    @apply bg-[#0B1625]/60 hover:bg-[#0F1D2D]/80 border border-white/[0.08] hover:border-cyan-400/30 backdrop-blur-lg rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-glow-cyan;
+    @apply bg-white hover:bg-white border border-slate-200/80 hover:border-blue-300/80 rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-premium-hover;
   }
 
   .glass-card-static {
-    @apply bg-[#0B1625]/70 border border-white/[0.08] backdrop-blur-lg rounded-2xl p-6 shadow-sm;
+    @apply bg-white border border-slate-200/80 rounded-2xl p-6 shadow-premium;
   }
 
-  /* Glass Form Inputs */
+  /* Light Form Inputs */
   .glass-input {
-    @apply w-full px-4 py-3.5 rounded-xl bg-[#07111F]/80 border border-white/[0.12] text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all duration-200 backdrop-blur-md text-sm;
+    @apply w-full px-4 py-3.5 rounded-xl bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 text-sm shadow-sm;
   }
 
-  /* Gradient Text */
+  /* Subtle Gradient Text */
   .gradient-text {
-    @apply bg-gradient-to-r from-cyan-400 via-teal-300 to-violet-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 bg-clip-text text-transparent;
   }
 
-  .gradient-text-cyan-violet {
-    @apply bg-gradient-to-r from-[#22D3EE] via-[#818CF8] to-[#8B5CF6] bg-clip-text text-transparent;
+  .gradient-text-blue-cyan {
+    @apply bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent;
   }
 
-  .gradient-text-subtle {
-    @apply bg-gradient-to-b from-white via-slate-200 to-slate-400 bg-clip-text text-transparent;
+  .gradient-text-blue-violet {
+    @apply bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent;
   }
 
-  /* Glowing Badges */
+  /* Light Glowing Badges */
+  .badge-blue {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/80;
+  }
+
   .badge-cyan {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200/80;
   }
 
   .badge-violet {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-300 border border-violet-500/30;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200/80;
   }
 
   .badge-emerald {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80;
   }
 
   .badge-amber {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80;
   }
 
   .badge-rose {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/30;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/80;
   }
 }
 
-/* Futuristic Ambient Grid Background */
-.smart-city-grid {
+/* Light Smart City Background Grid & Ambient Blobs */
+.smart-city-light-grid {
   background-image: 
-    radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.12) 0%, transparent 60%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.10) 0%, transparent 50%),
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    radial-gradient(circle at 50% 0%, rgba(219, 234, 254, 0.4) 0%, transparent 60%),
+    radial-gradient(circle at 90% 20%, rgba(237, 233, 254, 0.35) 0%, transparent 50%),
+    linear-gradient(to right, rgba(226, 232, 240, 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.6) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
 }
 
-.ambient-glow-cyan {
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, transparent 70%);
-}
-
-.ambient-glow-violet {
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
-}
-
-/* Custom Scrollbar */
+/* Clean Light Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #050B14;
+  background: #F8FAFC;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1A293E;
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #22D3EE;
+  background: #94A3B8;
 }
 
-/* Responsive Table */
-.table-responsive {
-  @apply w-full overflow-x-auto;
-}
-
-/* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

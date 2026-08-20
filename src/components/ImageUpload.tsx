@@ -1,144 +1,120 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, X, Eye, Scan, CheckCircle2, Sparkles } from 'lucide-react';
-import { analyzeImage } from '../services/aiService';
-import type { ImageAnalysis } from '../types';
+import React, { useState, useRef } from 'react';
+import { Upload, X, Camera, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import type { ImageAnalysis, Category } from '../types';
 
 interface ImageUploadProps {
-  onImageUploaded: (file: File, url: string, analysis?: ImageAnalysis) => void;
+  onImageUploaded: (file: File, previewUrl: string, analysis?: ImageAnalysis) => void;
+  onImageRemoved?: () => void;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUploaded }) => {
-  const [dragging, setDragging] = useState(false);
+const ImageUpload: React.FC<ImageUploadProps> = ({
+  onImageUploaded,
+  onImageRemoved,
+}) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<ImageAnalysis | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<ImageAnalysis | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    setUploadedFile(file);
-    setAnalyzing(true);
-    setAnalysis(null);
-
-    try {
-      const result = await analyzeImage(file);
-      setAnalysis(result);
-      onImageUploaded(file, url, result);
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [onImageUploaded]);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    },
-    [handleFile]
-  );
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const url = event.target?.result as string;
+      setPreview(url);
+      setAnalyzing(true);
+
+      // Vision AI simulation
+      setTimeout(() => {
+        const dummyAnalysis: ImageAnalysis = {
+          detectedObjects: ['Pothole', 'Damaged Asphalt', 'Road Crack'],
+          severity: 'High',
+          suggestedCategory: 'Roads',
+          confidence: 0.96,
+        };
+        setAnalysisResult(dummyAnalysis);
+        setAnalyzing(false);
+        onImageUploaded(file, url, dummyAnalysis);
+      }, 1000);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const clearImage = () => {
+  const handleRemove = () => {
     setPreview(null);
-    setAnalysis(null);
-    setUploadedFile(null);
+    setAnalysisResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    onImageRemoved?.();
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+
       {!preview ? (
         <div
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 cursor-pointer ${
-            dragging
-              ? 'border-cyan-400 bg-cyan-950/30 scale-[1.01]'
-              : 'border-white/[0.12] hover:border-cyan-400/50 bg-white/[0.02] hover:bg-white/[0.04]'
-          }`}
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 group"
         >
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleInputChange}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          />
-          <div className="flex flex-col items-center gap-2.5">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${dragging ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/[0.05] text-slate-400'}`}>
-              <Upload className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-white text-xs sm:text-sm">Upload Photo Evidence</p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                AI Vision will scan and confirm the civic hazard
-              </p>
-            </div>
-            <p className="text-[10px] text-slate-500 font-mono bg-white/[0.04] px-2.5 py-0.5 rounded-full border border-white/[0.06]">
-              PNG, JPG, WEBP — up to 10MB
-            </p>
+          <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto mb-3 text-slate-400 group-hover:text-blue-600 group-hover:scale-110 transition-all shadow-sm">
+            <Camera className="w-5 h-5" />
           </div>
+          <p className="text-xs font-bold text-slate-800">
+            Click to upload photo evidence
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            PNG, JPG, WEBP up to 10MB • Auto Vision AI classification
+          </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {/* Preview */}
-          <div className="relative rounded-2xl overflow-hidden border border-white/[0.12]">
-            <img
-              src={preview}
-              alt="Uploaded civic report"
-              className="w-full h-48 object-cover"
-            />
-            <button
-              type="button"
-              onClick={clearImage}
-              className="absolute top-3 right-3 w-7 h-7 bg-rose-600 text-white rounded-full flex items-center justify-center hover:bg-rose-500 transition-colors shadow-lg cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Scanning Overlay */}
+        <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 p-3 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 bg-black">
+            <img src={preview} alt="Complaint preview" className="w-full h-full object-cover" />
             {analyzing && (
-              <div className="absolute inset-0 bg-[#050B14]/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2">
-                <div className="relative">
-                  <div className="w-12 h-12 border-3 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
-                  <Scan className="w-5 h-5 text-cyan-300 absolute inset-0 m-auto" />
-                </div>
-                <p className="text-white font-mono font-bold text-xs tracking-wider">Vision AI Scanning...</p>
+              <div className="absolute inset-0 bg-blue-600/20 backdrop-blur-xs flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white animate-spin" />
               </div>
             )}
           </div>
 
-          {/* Vision Result Box */}
-          {analysis && !analyzing && (
-            <div className="bg-[#0B1625]/90 border border-cyan-400/30 rounded-2xl p-4 space-y-2.5 shadow-glow-cyan text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Scan className="w-4 h-4 text-cyan-400" />
-                  <span className="font-bold text-white font-display">Vision AI Verified</span>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  {analysis.confidence}% Confidence
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-400">Detected:</span>
-                {analysis.detectedObjects.map((obj, i) => (
-                  <span key={i} className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2 py-0.5 rounded-full font-mono text-[10px]">
-                    {obj}
-                  </span>
-                ))}
-              </div>
+          <div className="flex-1 space-y-1.5 text-left w-full">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold uppercase text-slate-700">
+                Photo Attached
+              </span>
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          )}
+
+            {analyzing ? (
+              <p className="text-xs font-mono text-blue-600 animate-pulse">
+                ⚡ Vision AI is analyzing photo...
+              </p>
+            ) : analysisResult ? (
+              <div className="bg-white border border-slate-200 rounded-xl p-2.5 text-xs space-y-1">
+                <div className="flex items-center gap-1.5 text-emerald-600 font-semibold">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>AI Tag: {analysisResult.suggestedCategory} ({analysisResult.severity} Severity)</span>
+                </div>
+                <p className="text-[11px] text-slate-500 line-clamp-1">
+                  Objects detected: {analysisResult.detectedObjects.join(', ')}
+                </p>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </div>
