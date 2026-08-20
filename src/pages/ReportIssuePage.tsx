@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   AlertCircle, MapPin, Navigation, User, Phone, Mail,
   ArrowRight, Loader2, FileText, CheckCircle2
@@ -27,14 +27,16 @@ const locationOptions = [
 
 const ReportIssuePage: React.FC = () => {
   const navigate = useNavigate();
+  const routeLocation = useLocation();
+  const routeState = (routeLocation.state as { initialDescription?: string; initialLocation?: string } | null) || {};
   const { toasts, addToast, dismissToast } = useToast();
 
   const [formData, setFormData] = useState({
     citizen_name: '',
     phone: '',
     email: '',
-    description: '',
-    location: '',
+    description: routeState.initialDescription || '',
+    location: routeState.initialLocation || '',
     latitude: '',
     longitude: '',
     landmark: '',
@@ -274,7 +276,7 @@ const ReportIssuePage: React.FC = () => {
           {/* Section: Image Upload */}
           <div className="space-y-2 pt-2">
             <label className="block text-xs font-semibold text-gray-700">
-              Upload Photo (Optional — analyzed by Vision AI)
+              Upload Photo (Optional â€” analyzed by Vision AI)
             </label>
             <ImageUpload onImageUploaded={handleImageUploaded} />
           </div>

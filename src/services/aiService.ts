@@ -1,20 +1,19 @@
-import type { Complaint, AIAnalysis, Category, ImageAnalysis } from '../types';
+import type { Complaint, AIAnalysis, Category, Priority, ImageAnalysis } from '../types';
 import { getDepartmentByCategory } from '../data/mockDepartments';
 import { delay } from '../utils/helpers';
 
 // ============================================================
-// Simulated AI service
-// Replace these functions with real API calls (Gemini, OpenAI, etc.)
+// Civic AI Service - Analysis & Civic Assistant Logic
 // ============================================================
 
-// Keywords â†’ Category mapping
+// Keywords -> Category mapping
 const categoryKeywords: Record<Category, string[]> = {
-  Roads: ['pothole', 'road', 'highway', 'street', 'tarmac', 'pavement', 'lane', 'traffic', 'marking', 'footpath'],
-  Garbage: ['garbage', 'trash', 'waste', 'litter', 'rubbish', 'dump', 'bin', 'stench', 'smell', 'filth', 'sanitation'],
-  Drainage: ['drain', 'drainage', 'flood', 'water logging', 'waterlogging', 'sewage', 'sewer', 'blockage', 'clog', 'overflow'],
-  Water: ['water', 'pipeline', 'pipe', 'supply', 'tap', 'leak', 'burst', 'contaminated', 'murky', 'dirty water'],
-  Streetlights: ['light', 'streetlight', 'lamp', 'dark', 'bulb', 'illumination', 'flickering'],
-  Electricity: ['electricity', 'wire', 'pole', 'power', 'transformer', 'shock', 'spark', 'blackout', 'short circuit'],
+  Roads: ['pothole', 'road', 'highway', 'street', 'tarmac', 'pavement', 'lane', 'traffic', 'marking', 'footpath', 'crater', 'asphalt'],
+  Garbage: ['garbage', 'trash', 'waste', 'litter', 'rubbish', 'dump', 'bin', 'stench', 'smell', 'filth', 'sanitation', 'debris'],
+  Drainage: ['drain', 'drainage', 'flood', 'water logging', 'waterlogging', 'sewage', 'sewer', 'blockage', 'clog', 'overflow', 'manhole'],
+  Water: ['water', 'pipeline', 'pipe', 'supply', 'tap', 'leak', 'burst', 'contaminated', 'murky', 'dirty water', 'pressure', 'tanker'],
+  Streetlights: ['streetlight', 'lamp', 'dark', 'bulb', 'illumination', 'flickering', 'street light', 'night lamp'],
+  Electricity: ['electricity', 'wire', 'pole', 'power', 'transformer', 'shock', 'spark', 'blackout', 'short circuit', 'voltage'],
   Infrastructure: ['bridge', 'footpath', 'sidewalk', 'bench', 'park', 'building', 'wall', 'structure', 'crack', 'collapse', 'broken'],
   Other: [],
 };
@@ -22,14 +21,14 @@ const categoryKeywords: Record<Category, string[]> = {
 // Severity keywords for priority detection
 const highPriorityKeywords = [
   'accident', 'dangerous', 'emergency', 'urgent', 'collapsed', 'burst', 'gushing', 'flooding', 'injured',
-  'severe', 'critical', 'huge', 'major', 'serious', 'unsafe', 'blocked road', 'no supply',
+  'severe', 'critical', 'huge', 'major', 'serious', 'unsafe', 'blocked road', 'no supply', 'shock', 'live wire',
 ];
 const mediumPriorityKeywords = [
-  'overflowing', 'accumulating', 'days', 'week', 'multiple', 'continuous', 'ongoing', 'residents', 'colony',
+  'overflowing', 'accumulating', 'days', 'week', 'multiple', 'continuous', 'ongoing', 'residents', 'colony', 'dark',
 ];
 
 /** Detect category from complaint text */
-function detectCategory(text: string): Category {
+export function detectCategory(text: string): Category {
   const lower = text.toLowerCase();
   let bestCategory: Category = 'Other';
   let bestScore = 0;
@@ -41,23 +40,30 @@ function detectCategory(text: string): Category {
       bestCategory = category as Category;
     }
   }
+
+  // Fallback defaults based on common terms
+  if (bestScore === 0) {
+    if (lower.includes('light') || lower.includes('pole')) return 'Streetlights';
+    if (lower.includes('water') || lower.includes('leak')) return 'Water';
+    if (lower.includes('road') || lower.includes('hole')) return 'Roads';
+    if (lower.includes('garbage') || lower.includes('clean')) return 'Garbage';
+    if (lower.includes('drain') || lower.includes('gutter')) return 'Drainage';
+  }
+
   return bestCategory;
 }
 
 /** Detect priority from complaint text */
-function detectPriority(text: string): 'HIGH' | 'MEDIUM' | 'LOW' {
+export function detectPriority(text: string): Priority {
   const lower = text.toLowerCase();
-  const highCount = highPriorityKeywords.filter((kw) => lower.includes(kw)).length;
-  const medCount = mediumPriorityKeywords.filter((kw) => lower.includes(kw)).length;
 
-  if (highCount >= 2) return 'HIGH';
-  if (highCount >= 1) return 'HIGH';
-  if (medCount >= 2) return 'MEDIUM';
-  if (medCount >= 1) return 'MEDIUM';
-  return 'LOW';
+  if (highPriorityKeywords.some((kw) => lower.includes(kw))) return 'HIGH';
+  if (mediumPriorityKeywords.some((kw) => lower.includes(kw))) return 'MEDIUM';
+  if (lower.includes('spark') || lower.includes('wire') || lower.includes('burst')) return 'CRITICAL';
+
+  return 'MEDIUM';
 }
 
-/** Generate a human-readable issue title */
 function generateTitle(text: string, category: Category): string {
   const lower = text.toLowerCase();
 
@@ -66,13 +72,13 @@ function generateTitle(text: string, category: Category): string {
     Garbage: ['Garbage overflow requiring sanitation', 'Waste accumulation in public area', 'Illegal dumping reported'],
     Drainage: ['Drainage blockage causing flooding', 'Clogged drain creating waterlogging', 'Storm drain overflow reported'],
     Water: ['Water pipeline break requiring repair', 'Water supply disruption reported', 'Contaminated water supply issue'],
-    Streetlights: ['Non-functional streetlights reported', 'Street lighting failure in public area', 'Electrical lighting issue'],
+    Streetlights: ['Non-functional streetlights reported', 'Street lighting failure in public area', 'Dark street lighting issue'],
+    Electricity: ['Electrical line issue reported', 'Damaged power line or pole', 'Electricity hazard reported'],
     Infrastructure: ['Public infrastructure damage reported', 'Civic structure requiring repair', 'Public facility damage'],
   };
 
   const options = titleMap[category] || ['Civic issue reported'];
 
-  // Try to pick relevant title
   if (lower.includes('pothole')) return 'Large pothole causing unsafe road conditions';
   if (lower.includes('burst') || lower.includes('gushing')) return 'Water pipeline burst causing supply disruption';
   if (lower.includes('flood')) return 'Drainage blockage causing severe flooding';
@@ -82,10 +88,9 @@ function generateTitle(text: string, category: Category): string {
   return options[Math.floor(Math.random() * options.length)];
 }
 
-/** Generate AI reasoning for the decision */
 function generateReason(text: string, category: Category, priority: string): string {
   const reasonMap: Record<string, string> = {
-    Roads_HIGH: 'Large road damage near high-traffic area creates significant safety risk for vehicles and pedestrians.',
+    Roads_HIGH: 'Large road damage near traffic area creates significant safety risk for vehicles and pedestrians.',
     Roads_MEDIUM: 'Road surface damage in moderately trafficked area requires timely repair to prevent worsening.',
     Roads_LOW: 'Minor road issue that needs attention to prevent escalation.',
     Garbage_HIGH: 'Waste accumulation near high-footfall area poses immediate public health and hygiene risk.',
@@ -100,6 +105,7 @@ function generateReason(text: string, category: Category, priority: string): str
     Streetlights_HIGH: 'Complete streetlight failure creating dangerous dark zones in public areas.',
     Streetlights_MEDIUM: 'Street lighting issues affecting public safety in residential or commercial areas.',
     Streetlights_LOW: 'Minor street lighting issue requiring routine maintenance.',
+    Electricity_HIGH: 'Electrical hazard reported requiring immediate power grid inspection and repair.',
     Infrastructure_HIGH: 'Critical infrastructure damage posing immediate danger to public safety.',
     Infrastructure_MEDIUM: 'Infrastructure damage that requires prompt repair to prevent worsening.',
     Infrastructure_LOW: 'Infrastructure maintenance required to maintain public facility standards.',
@@ -109,37 +115,31 @@ function generateReason(text: string, category: Category, priority: string): str
   return reasonMap[key] || 'Civic issue identified requiring appropriate departmental action.';
 }
 
-/** Get estimated response time based on priority */
 function getEstimatedResponse(priority: string): string {
   switch (priority) {
+    case 'CRITICAL': return '12-24 hours';
     case 'HIGH': return '24-48 hours';
     case 'MEDIUM': return '48-72 hours';
     default: return '72-96 hours';
   }
 }
 
-// ============================================================
-// Public API
-// ============================================================
-
 /**
  * Analyze a complaint text and return AI analysis.
- * This simulates a call to an LLM (e.g., Gemini, GPT-4).
  */
 export async function analyzeComplaint(
   description: string,
   location: string,
   _imageUrl?: string
 ): Promise<AIAnalysis> {
-  // Simulate network + AI processing delay
-  await delay(3500);
+  await delay(2500);
 
   const category = detectCategory(description);
   const priority = detectPriority(description);
   const department = getDepartmentByCategory(category);
   const title = generateTitle(description, category);
   const reason = generateReason(description, category, priority);
-  const confidence = 80 + Math.floor(Math.random() * 17); // 80-96%
+  const confidence = 85 + Math.floor(Math.random() * 12); // 85-97%
 
   return {
     title,
@@ -155,14 +155,11 @@ export async function analyzeComplaint(
 }
 
 /**
- * Simulate computer vision analysis of an uploaded image.
- * In production, this would call a Vision model (Gemini Vision, GPT-4V, etc.)
+ * Image analysis simulation
  */
 export async function analyzeImage(_imageFile: File): Promise<ImageAnalysis> {
-  await delay(2000);
+  await delay(1500);
 
-  // Return simulated vision analysis
-  // In real implementation, send image bytes to vision API
   const analyses: ImageAnalysis[] = [
     {
       detectedObjects: ['Road surface damage', 'Pothole', 'Vehicle traffic', 'Asphalt crack'],
@@ -171,13 +168,13 @@ export async function analyzeImage(_imageFile: File): Promise<ImageAnalysis> {
       confidence: 92,
     },
     {
-      detectedObjects: ['Garbage pile', 'Overflowing bin', 'Waste material', 'Rodent activity'],
+      detectedObjects: ['Garbage pile', 'Overflowing bin', 'Waste material'],
       severity: 'High',
       suggestedCategory: 'Garbage',
       confidence: 88,
     },
     {
-      detectedObjects: ['Water flow', 'Flooded road', 'Blocked drain', 'Standing water'],
+      detectedObjects: ['Water flow', 'Flooded road', 'Blocked drain'],
       severity: 'Medium',
       suggestedCategory: 'Drainage',
       confidence: 85,
@@ -189,7 +186,7 @@ export async function analyzeImage(_imageFile: File): Promise<ImageAnalysis> {
       confidence: 81,
     },
     {
-      detectedObjects: ['Water pipe', 'Leaking joint', 'Water seepage', 'Wet ground'],
+      detectedObjects: ['Water pipe', 'Leaking joint', 'Water seepage'],
       severity: 'High',
       suggestedCategory: 'Water',
       confidence: 90,
@@ -200,115 +197,199 @@ export async function analyzeImage(_imageFile: File): Promise<ImageAnalysis> {
 }
 
 // ============================================================
-// AI Chat responses
+// AI Civic Chatbot Engine
 // ============================================================
 
-interface ChatContext {
-  lastCategory?: string;
-  locationAsked?: boolean;
-  locationProvided?: boolean;
+export interface ChatBotResponse {
+  message: string;
+  suggestComplaint?: boolean;
+  suggestTracking?: boolean;
+  suggestedCategory?: string;
+  suggestedPriority?: string;
+  ticketIdDetected?: string;
+  quickOptions?: Array<{ label: string; text: string }>;
 }
 
-const chatContext: ChatContext = {};
-
 /**
- * Generate an AI chat response.
- * In production, replace with Gemini/GPT-4 streaming API call.
+ * Generate intelligent AI responses for CivicResolve AI Assistant 🤖
  */
 export async function getChatResponse(
   userMessage: string,
   _conversationHistory: Array<{ role: string; content: string }>
-): Promise<{ message: string; suggestComplaint?: boolean; category?: string }> {
-  await delay(1000 + Math.random() * 1000);
+): Promise<ChatBotResponse> {
+  await delay(400);
 
-  const lower = userMessage.toLowerCase();
+  const lower = userMessage.toLowerCase().trim();
 
-  // Detect intent
-  const isGreeting = /^(hi|hello|hey|good|namaste)/i.test(lower);
-  const mentionsWater = lower.includes('water') || lower.includes('pipe') || lower.includes('leak');
-  const mentionsRoad = lower.includes('pothole') || lower.includes('road') || lower.includes('street');
-  const mentionsGarbage = lower.includes('garbage') || lower.includes('waste') || lower.includes('trash');
-  const mentionsDrain = lower.includes('drain') || lower.includes('flood') || lower.includes('waterlog');
-  const mentionsLight = lower.includes('light') || lower.includes('dark') || lower.includes('lamp');
-  const mentionsLocation = lower.includes('near') || lower.includes('road') || lower.includes('street') || lower.includes('colony') || lower.includes('area') || /\d/.test(lower);
-  const isTracking = lower.includes('track') || lower.includes('status') || lower.includes('complaint');
-
-  if (isGreeting) {
+  // 1. Check if user typed a Ticket ID (e.g. CR-2026-000001 or CR-2026-004821 or 6-digit id)
+  const ticketIdMatch = userMessage.match(/CR-\d{4}-\d{6}/i) || userMessage.match(/CR-\d{4}-\d+/i);
+  if (ticketIdMatch) {
     return {
-      message: "Hello! ðŸ‘‹ I'm **Civic AI**, your smart assistant for civic complaints. I can help you:\n\nâ€¢ ðŸ“ **Report a civic problem** (potholes, garbage, drainage, lights, water)\nâ€¢ ðŸ” **Track your complaint** status\nâ€¢ ðŸ“Š **Understand AI routing** decisions\n\nWhat civic issue can I help you with today?",
+      message: `🔍 Fetching live details from PostgreSQL for Ticket **${ticketIdMatch[0].toUpperCase()}**...`,
+      ticketIdDetected: ticketIdMatch[0].toUpperCase(),
     };
   }
 
-  if (isTracking) {
+  // 2. FAQ: "What can I report?"
+  if (
+    lower.includes('what can i report') ||
+    lower.includes('types of complaint') ||
+    lower.includes('categories') ||
+    lower.includes('what issues')
+  ) {
     return {
-      message: "To track your complaint, you can:\n\n1. Visit the **Track Complaint** page\n2. Enter your **Complaint ID** (format: CR-2026-XXXXXX)\n\nYou can also check the timeline of any complaint to see real-time status updates. Would you like to report a new issue instead?",
+      message: `🏛️ **What You Can Report on CivicResolve AI:**\n\n` +
+        `• 🛣️ **Roads & Footpaths:** Potholes, broken tarmac, uneven pavements, open manholes.\n` +
+        `• 🗑️ **Garbage & Sanitation:** Overflowing dustbins, uncollected trash, illegal dumping.\n` +
+        `• 🌊 **Drainage & Sewage:** Blocked storm drains, waterlogging, sewage overflow.\n` +
+        `• 💧 **Water Supply:** Pipe bursts, contaminated supply, low pressure, leaks.\n` +
+        `• 💡 **Streetlights & Power:** Dark zones, broken lamp posts, exposed wires.\n` +
+        `• 🏢 **Public Infrastructure:** Damaged park benches, broken walls, bridges.\n\n` +
+        `Describe any of these issues and I'll help you submit it right away!`,
+      quickOptions: [
+        { label: '📝 Report an Issue', text: 'I want to report an issue' },
+        { label: '🔎 Track Complaint', text: 'How do I track my complaint?' },
+      ],
     };
   }
 
-  if (mentionsWater && !chatContext.locationAsked) {
-    chatContext.lastCategory = 'Water';
-    chatContext.locationAsked = true;
+  // 3. FAQ: "How do I report a pothole?" or "How to report"
+  if (
+    lower.includes('how do i report') ||
+    lower.includes('how to report') ||
+    lower.includes('report a pothole') ||
+    lower.includes('submit complaint')
+  ) {
     return {
-      message: "ðŸ” I understand this as a **Water Supply / Infrastructure issue**.\n\nThis could involve:\nâ€¢ Broken pipelines\nâ€¢ Water supply disruption\nâ€¢ Water contamination\nâ€¢ Leakage\n\nCan you tell me the **exact location or a nearby landmark**? This helps route your complaint to the correct zone team.",
-    };
-  }
-
-  if (mentionsRoad && !chatContext.locationAsked) {
-    chatContext.lastCategory = 'Roads';
-    chatContext.locationAsked = true;
-    return {
-      message: "ðŸ” I understand this as a **Road Infrastructure issue**.\n\nThis likely involves:\nâ€¢ Pothole or road damage\nâ€¢ Road surface deterioration\nâ€¢ Safety hazard for vehicles\n\nCan you provide the **location or nearest landmark**? Our AI will determine the exact zone and assign the right team.",
-    };
-  }
-
-  if (mentionsGarbage && !chatContext.locationAsked) {
-    chatContext.lastCategory = 'Garbage';
-    chatContext.locationAsked = true;
-    return {
-      message: "ðŸ” I understand this as a **Sanitation / Garbage issue**.\n\nThis involves:\nâ€¢ Garbage accumulation\nâ€¢ Overflowing bins\nâ€¢ Illegal dumping\n\nWhere is this happening? Please share the **location or nearby landmark**.",
-    };
-  }
-
-  if (mentionsDrain && !chatContext.locationAsked) {
-    chatContext.lastCategory = 'Drainage';
-    chatContext.locationAsked = true;
-    return {
-      message: "ðŸ” I understand this as a **Drainage / Flooding issue**.\n\nThis involves:\nâ€¢ Clogged drains\nâ€¢ Waterlogging\nâ€¢ Flooding during rain\n\nPlease share the **location** so I can route it to the correct drainage team.",
-    };
-  }
-
-  if (mentionsLight && !chatContext.locationAsked) {
-    chatContext.lastCategory = 'Streetlights';
-    chatContext.locationAsked = true;
-    return {
-      message: "ðŸ” I understand this as a **Street Lighting issue**.\n\nThis involves:\nâ€¢ Non-functional streetlights\nâ€¢ Flickering lights\nâ€¢ Dark zones at night\n\nCan you tell me the **street or area name** where the lights are not working?",
-    };
-  }
-
-  if (mentionsLocation && chatContext.locationAsked && !chatContext.locationProvided) {
-    chatContext.locationProvided = true;
-    const category = chatContext.lastCategory || 'Roads';
-    const deptMap: Record<string, string> = {
-      Water: 'Water Supply & Distribution Department',
-      Roads: 'Municipal Roads & Infrastructure Department',
-      Garbage: 'Sanitation & Waste Management Department',
-      Drainage: 'Drainage & Stormwater Management',
-      Streetlights: 'Electrical & Street Lighting Division',
-    };
-
-    return {
-      message: `âœ… **AI Analysis Complete!**\n\nðŸ“ **Location:** ${userMessage}\n\nðŸ·ï¸ **Category:** ${category}\nâš¡ **Priority:** HIGH\nðŸ¢ **Department:** ${deptMap[category] || 'Municipal Department'}\n\n*"Your complaint has been analyzed and the responsible department has been identified. Would you like me to create a complaint ticket for you?"*`,
+      message: `📝 **How to Report a Civic Issue (3 Easy Steps):**\n\n` +
+        `1️⃣ **Describe Issue:** Enter your name, phone, and describe the problem.\n` +
+        `2️⃣ **AI Auto-Analysis:** Our AI automatically detects the category, priority, and routes it to the right department.\n` +
+        `3️⃣ **Get Ticket ID:** You receive a unique Ticket ID (e.g. \`CR-2026-000001\`) to track live progress.\n\n` +
+        `Would you like to start a complaint now?`,
       suggestComplaint: true,
-      category,
+      quickOptions: [
+        { label: '📝 Report Now', text: 'I want to report an issue' },
+      ],
     };
   }
 
-  // Default helpful response
-  chatContext.lastCategory = undefined;
-  chatContext.locationAsked = false;
-  chatContext.locationProvided = false;
+  // 4. FAQ: "How can I track my complaint?"
+  if (
+    lower.includes('how can i track') ||
+    lower.includes('how to track') ||
+    lower.includes('where to track') ||
+    lower === 'track complaint' ||
+    lower === '🔎 track complaint'
+  ) {
+    return {
+      message: `🔎 **How to Track Your Complaint:**\n\n` +
+        `1. **Type your Ticket ID right here in the chat** (e.g. \`CR-2026-000001\`) and I'll query PostgreSQL live for you!\n` +
+        `2. Or visit the **Track Complaint** page directly to see the complete resolution timeline.\n\n` +
+        `Do you have a Ticket ID handy? Type it below!`,
+      suggestTracking: true,
+      quickOptions: [
+        { label: '🔎 Go to Tracking Page', text: 'Track Complaint' },
+      ],
+    };
+  }
 
+  // 5. FAQ: "What does Under Review mean?" or status meanings
+  if (
+    lower.includes('under review') ||
+    lower.includes('status mean') ||
+    lower.includes('what does status')
+  ) {
+    return {
+      message: `📊 **Complaint Status Guide:**\n\n` +
+        `• 🟡 **REGISTERED:** Complaint successfully recorded in the PostgreSQL database.\n` +
+        `• 🔍 **UNDER REVIEW:** Authority has opened your ticket and is assessing the site.\n` +
+        `• 👷 **ASSIGNED:** Field inspection officer and maintenance team dispatched.\n` +
+        `• 🛠️ **IN PROGRESS:** Active repair and resolution work is underway.\n` +
+        `• 🟢 **RESOLVED:** Issue fixed and verified by municipal authority.\n` +
+        `• 🔴 **REJECTED:** Duplicate or out-of-jurisdiction report.`,
+      quickOptions: [
+        { label: '🔎 Track My Ticket', text: 'How do I track my complaint?' },
+        { label: '📝 Report New Issue', text: 'I want to report an issue' },
+      ],
+    };
+  }
+
+  // 6. FAQ: "Which category should I select for garbage?"
+  if (
+    lower.includes('which category') ||
+    lower.includes('category for garbage') ||
+    lower.includes('select category')
+  ) {
+    return {
+      message: `🗑️ **For Garbage & Waste Issues:**\n\n` +
+        `Select the **Garbage** category for:\n` +
+        `• Overflowing public dustbins\n` +
+        `• Street waste accumulation\n` +
+        `• Missed door-to-door garbage collection\n` +
+        `• Illegal open dumping\n\n` +
+        `Our AI automatically routes this to the **Solid Waste Management & Sanitation Department**.`,
+      suggestComplaint: true,
+    };
+  }
+
+  // 7. Greetings
+  const isGreeting = /^(hi|hello|hey|good morning|good evening|namaste|start)/i.test(lower);
+  if (isGreeting || lower === '💡 civic help' || lower === 'civic help') {
+    return {
+      message: `👋 Hello! I'm your **CivicResolve AI Assistant 🤖**.\n\n` +
+        `I can help you report local civic issues, track existing complaints from our PostgreSQL database, or answer any municipal resolution questions.\n\n` +
+        `How can I assist you today?`,
+      quickOptions: [
+        { label: '📝 Report an Issue', text: 'I want to report an issue' },
+        { label: '🔎 Track Complaint', text: 'How do I track my complaint?' },
+        { label: '💡 Civic Help', text: 'What can I report?' },
+      ],
+    };
+  }
+
+  // 8. Issue Description Detection (e.g. "There is a large pothole near my college")
+  const category = detectCategory(lower);
+  const priority = detectPriority(lower);
+  const isIssueDescription =
+    category !== 'Other' ||
+    lower.includes('pothole') ||
+    lower.includes('garbage') ||
+    lower.includes('water') ||
+    lower.includes('drain') ||
+    lower.includes('light') ||
+    lower.includes('broken') ||
+    lower.includes('leak') ||
+    lower.includes('dark');
+
+  if (isIssueDescription && category !== 'Other') {
+    const dept = getDepartmentByCategory(category);
+    return {
+      message: `🛠️ **I can help you report this issue!**\n\n` +
+        `• 🏷️ **Suggested Category:** ${category}\n` +
+        `• ⚡ **Suggested Priority:** ${priority}\n` +
+        `• 🏢 **Responsible Department:** ${dept.name}\n\n` +
+        `Click **"Report This Issue"** below to review and submit it to our central system!`,
+      suggestComplaint: true,
+      suggestedCategory: category,
+      suggestedPriority: priority,
+      quickOptions: [
+        { label: '📝 Report This Issue', text: 'Report This Issue' },
+        { label: '💡 Ask Another Question', text: 'What can I report?' },
+      ],
+    };
+  }
+
+  // Default fallback
   return {
-    message: "I can help you report civic issues like:\n\nðŸ›£ï¸ **Roads** â€” Potholes, road damage\nðŸ—‘ï¸ **Garbage** â€” Waste accumulation\nðŸŒŠ **Drainage** â€” Flooding, blockages\nðŸ’§ **Water** â€” Pipeline issues, supply\nðŸ’¡ **Streetlights** â€” Broken lights\nðŸ—ï¸ **Infrastructure** â€” Public facility damage\n\nDescribe the problem you're facing and I'll help you report it or track an existing complaint.",
+    message: `🤖 I'm here to help with civic problem reporting and tracking.\n\n` +
+      `You can tell me about:\n` +
+      `• A civic issue (e.g., *"Large pothole on MG Road"*)\n` +
+      `• A ticket ID (e.g., \`CR-2026-000001\`) to track live status\n` +
+      `• Or ask *"What can I report?"* for category guidance.`,
+    quickOptions: [
+      { label: '📝 Report an Issue', text: 'I want to report an issue' },
+      { label: '🔎 Track Complaint', text: 'How do I track my complaint?' },
+      { label: '💡 Civic Help', text: 'What can I report?' },
+    ],
   };
 }
