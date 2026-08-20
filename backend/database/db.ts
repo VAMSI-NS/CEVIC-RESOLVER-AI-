@@ -29,6 +29,35 @@ export interface ComplaintRow {
 let pool: pg.Pool | null = null;
 let usePostgres = false;
 
+// Direct embedded SQL DDL schema to avoid filesystem issues in ESM/serverless
+const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS complaints (
+    id SERIAL PRIMARY KEY,
+    ticket_id VARCHAR(50) UNIQUE NOT NULL,
+    citizen_name VARCHAR(255),
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    complaint_title VARCHAR(255) NOT NULL,
+    complaint_description TEXT NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    priority VARCHAR(50) NOT NULL DEFAULT 'MEDIUM',
+    status VARCHAR(50) NOT NULL DEFAULT 'REGISTERED',
+    location VARCHAR(255) NOT NULL,
+    latitude NUMERIC(10, 7),
+    longitude NUMERIC(10, 7),
+    authority VARCHAR(255),
+    image_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_ticket_id ON complaints(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
+CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
+CREATE INDEX IF NOT EXISTS idx_complaints_priority ON complaints(priority);
+CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints(created_at DESC);
+`;
+
 // Fallback local storage file if PostgreSQL is not connected locally
 const LOCAL_STORAGE_FILE = path.resolve(process.cwd(), 'backend/database/local_complaints.json');
 
@@ -46,7 +75,6 @@ function loadLocalDatabase(): void {
       saveLocalDatabase();
     }
   } catch (err) {
-    console.error('[DB] Warning: Could not load local storage file:', err);
     localDatabase = [];
   }
 }
@@ -60,7 +88,7 @@ function saveLocalDatabase(): void {
     }
     fs.writeFileSync(LOCAL_STORAGE_FILE, JSON.stringify(localDatabase, null, 2), 'utf-8');
   } catch (err) {
-    console.error('[DB] Warning: Could not save to local storage file:', err);
+    // Ignore local save errors in production environments
   }
 }
 
@@ -84,7 +112,7 @@ export async function initDatabase(): Promise<void> {
         ssl: isSsl ? { rejectUnauthorized: false } : undefined,
         max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 10000,
       });
 
       // Test connection
@@ -92,36 +120,31 @@ export async function initDatabase(): Promise<void> {
       try {
         await client.query('SELECT NOW()');
         usePostgres = true;
-        console.log('[DB] ? PostgreSQL Connected successfully!');
+        console.log('[DB] ✅ PostgreSQL Connected successfully to Cloud Database!');
 
-        // Run table schema
-        const schemaPath = path.resolve(__dirname, 'schema.sql');
-        if (fs.existsSync(schemaPath)) {
-          const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
-          await client.query(schemaSql);
-          console.log('[DB] ? Complaints table schema initialized in PostgreSQL.');
-        }
+        // Run table schema directly
+        await client.query(SCHEMA_SQL);
+        console.log('[DB] ✅ Table "complaints" verified in PostgreSQL.');
       } finally {
         client.release();
       }
-      return;
-    } catch (err: any) {
-      console.warn(`[DB] ⚠️ PostgreSQL connection failed (${err.message}). Using local SQL persistence storage.`);
+    } catch (dbErr: any) {
+      console.warn(`[DB] ⚠️ PostgreSQL connection error (${dbErr.message}). Using local persistence.`);
       usePostgres = false;
-      pool = null;
     }
   } else {
     console.log('[DB] ℹ️ DATABASE_URL not set. Operating in local SQL persistent storage mode.');
+    usePostgres = false;
   }
 
-  // Fallback initial sample data if local database is empty
-  if (localDatabase.length === 0) {
-    seedLocalFallbackData();
+  // Populate seed complaints if completely empty in local mode
+  if (!usePostgres && localDatabase.length === 0) {
+    seedInitialDemoData();
   }
 }
 
-/** Seed local fallback data for immediate testing */
-function seedLocalFallbackData(): void {
+/** Seed demo complaints for offline dev */
+function seedInitialDemoData(): void {
   const now = new Date();
   localDatabase = [
     {
@@ -129,9 +152,9 @@ function seedLocalFallbackData(): void {
       ticket_id: 'CR-2026-004821',
       citizen_name: 'Rahul Sharma',
       phone: '9876543210',
-      email: 'rahul.sharma@example.com',
-      complaint_title: 'Large pothole near college bus stop',
-      complaint_description: 'There is a huge pothole near the college bus stop and vehicles are struggling to pass. Two-wheelers have already fallen due to this.',
+      email: 'rahul.s@example.com',
+      complaint_title: 'Dangerous pothole near city college bus stop',
+      complaint_description: 'A deep crater-sized pothole has formed on the left lane right in front of the main bus stop. Multiple two-wheelers have skidded.',
       category: 'Roads',
       priority: 'HIGH',
       status: 'ASSIGNED',
