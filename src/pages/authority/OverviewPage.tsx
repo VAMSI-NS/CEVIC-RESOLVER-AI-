@@ -1,58 +1,47 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ClipboardList, AlertTriangle, Clock, CheckCircle,
-  Brain, RefreshCw, ArrowRight, TrendingUp
+  ClipboardList, CheckCircle2, Clock, AlertTriangle, ArrowRight,
+  TrendingUp, Users, RefreshCw, Shield, MapPin, Sparkles, Building2,
+  Activity, ArrowUpRight, PlusCircle
 } from 'lucide-react';
-import DashboardCard from '../../components/DashboardCard';
-import PriorityBadge from '../../components/PriorityBadge';
-import StatusBadge from '../../components/StatusBadge';
-import {
-  getAllComplaints,
-  getAnalyticsSummary,
-  fetchAllComplaintsApi,
-  fetchDashboardStatsApi,
-} from '../../services/complaintService';
+import { fetchAllComplaintsApi, fetchDashboardStatsApi } from '../../services/complaintService';
 import type { Complaint } from '../../types';
-import { formatDateTime, getCategoryEmoji, truncate } from '../../utils/helpers';
-
-// ============================================================
-// Authority Dashboard - Overview Page
-// ============================================================
 
 const OverviewPage: React.FC = () => {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [summary, setSummary] = useState(getAnalyticsSummary());
+  const [stats, setStats] = useState({
+    total: 0,
+    registered: 0,
+    under_review: 0,
+    in_progress: 0,
+    resolved: 0,
+    critical: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
-    // 1. Initial cached state
-    const localAll = getAllComplaints();
-    setComplaints(localAll.slice(0, 6));
-    setSummary(getAnalyticsSummary());
-
-    // 2. Fetch live data from SQL backend
+    setLoading(true);
     try {
-      const [freshComplaints, stats] = await Promise.all([
+      const [list, statsData] = await Promise.all([
         fetchAllComplaintsApi(),
         fetchDashboardStatsApi(),
       ]);
-
-      if (freshComplaints && freshComplaints.length > 0) {
-        setComplaints(freshComplaints.slice(0, 6));
+      setComplaints(list.slice(0, 6));
+      if (statsData) {
+        setStats({
+          total: statsData.total || list.length,
+          registered: statsData.registered || 0,
+          under_review: statsData.under_review || 0,
+          in_progress: statsData.in_progress || 0,
+          resolved: statsData.resolved || 0,
+          critical: statsData.critical || 0,
+        });
       }
-
-      if (stats && stats.total !== undefined) {
-        setSummary((prev) => ({
-          ...prev,
-          totalComplaints: stats.total,
-          highPriority: stats.high || 0,
-          pending: (stats.registered || 0) + (stats.under_review || 0) + (stats.assigned || 0) + (stats.in_progress || 0),
-          resolved: stats.resolved || 0,
-          resolutionRate: stats.total > 0 ? Math.round(((stats.resolved || 0) / stats.total) * 100) : prev.resolutionRate,
-        }));
-      }
-    } catch (err) {
-      console.warn('Live overview fetch failed, using local values:', err);
+    } catch {
+      // Fallback handled gracefully
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,170 +49,163 @@ const OverviewPage: React.FC = () => {
     loadData();
   }, []);
 
-  const handleRefresh = () => {
-    loadData();
-  };
-
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
+      
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Civic Operations Center</h1>
-          <p className="text-gray-500 text-sm mt-0.5">Real-time PostgreSQL database complaint management dashboard</p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 bg-white border border-gray-200 px-3 py-2 rounded-xl hover:shadow-sm transition-all"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
-      </div>
-
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <DashboardCard
-          title="Total Complaints"
-          value={summary.totalComplaints.toLocaleString()}
-          subtitle="All time (Database)"
-          icon={<ClipboardList className="w-6 h-6" />}
-          color="indigo"
-          trend={{ value: 12, label: 'this month' }}
-        />
-        <DashboardCard
-          title="High Priority"
-          value={summary.highPriority}
-          subtitle="Needs urgent attention"
-          icon={<AlertTriangle className="w-6 h-6" />}
-          color="red"
-          trend={{ value: -5, label: 'vs last week' }}
-        />
-        <DashboardCard
-          title="Pending"
-          value={summary.pending}
-          subtitle="Awaiting resolution"
-          icon={<Clock className="w-6 h-6" />}
-          color="orange"
-        />
-        <DashboardCard
-          title="Resolved"
-          value={summary.resolved}
-          subtitle={`${summary.resolutionRate}% resolution rate`}
-          icon={<CheckCircle className="w-6 h-6" />}
-          color="green"
-          trend={{ value: 8, label: 'this week' }}
-        />
-      </div>
-
-      {/* AI Routing Decision Panel */}
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <Brain className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">AI Routing Decision</h2>
-            <p className="text-indigo-200 text-sm">Latest AI-analyzed complaint</p>
-          </div>
-          <div className="ml-auto flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm font-medium">Live</span>
-          </div>
-        </div>
-
-        <div className="bg-white/10 rounded-xl p-4 mb-4">
-          <p className="text-indigo-200 text-xs mb-2">Input Complaint</p>
-          <p className="text-white font-medium">
-            "Garbage has been accumulating for three days near the market area. Flies and rodents are visible."
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">
+            Host Control Console
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-0.5">
+            Civic Operations Center
+          </h1>
+          <p className="text-xs text-slate-400">
+            Real-time urban telemetry and PostgreSQL complaint dispatch
           </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Category', value: 'Garbage' },
-            { label: 'Priority', value: 'MEDIUM' },
-            { label: 'Department', value: 'Sanitation' },
-            { label: 'Assigned Team', value: 'Zone 3 Team' },
-          ].map((item) => (
-            <div key={item.label} className="bg-white/10 rounded-xl p-3">
-              <p className="text-indigo-300 text-xs">{item.label}</p>
-              <p className="text-white font-semibold text-sm mt-0.5">{item.value}</p>
-            </div>
-          ))}
-        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-cyan-400' : ''}`} />
+            <span>Sync Cloud Data</span>
+          </button>
 
-        <div className="mt-4 bg-white/10 rounded-xl p-3">
-          <p className="text-indigo-200 text-xs mb-1">AI Reasoning</p>
-          <p className="text-white text-sm italic">
-            "Accumulated waste in a high-footfall public area requires sanitation intervention. 3-day delay increases health risk."
-          </p>
-        </div>
-      </div>
-
-      {/* Recent complaints */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900">Recent Complaints</h2>
           <Link
             to="/authority/complaints"
-            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+            className="btn-primary text-xs py-2.5 px-4"
           >
-            View all <ArrowRight className="w-3.5 h-3.5" />
+            <span>Manage All Tickets</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* 5 KPI Metric Glass Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        
+        {/* Total */}
+        <div className="glass-panel p-5 space-y-2 border-white/[0.08] hover:border-cyan-400/40 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Total Filed</span>
+            <ClipboardList className="w-4 h-4 text-cyan-400" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-white font-display">
+            {stats.total}
+          </p>
+          <span className="text-[10px] text-cyan-300 font-mono">100% in PostgreSQL</span>
+        </div>
+
+        {/* Registered */}
+        <div className="glass-panel p-5 space-y-2 border-white/[0.08] hover:border-amber-400/40 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Registered</span>
+            <Clock className="w-4 h-4 text-amber-400" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-amber-400 font-display">
+            {stats.registered}
+          </p>
+          <span className="text-[10px] text-slate-400 font-mono">Pending review</span>
+        </div>
+
+        {/* Under Review */}
+        <div className="glass-panel p-5 space-y-2 border-white/[0.08] hover:border-blue-400/40 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Under Review</span>
+            <Activity className="w-4 h-4 text-blue-400" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-blue-400 font-display">
+            {stats.under_review}
+          </p>
+          <span className="text-[10px] text-slate-400 font-mono">Zonal assessment</span>
+        </div>
+
+        {/* In Progress */}
+        <div className="glass-panel p-5 space-y-2 border-white/[0.08] hover:border-indigo-400/40 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase">In Progress</span>
+            <Building2 className="w-4 h-4 text-indigo-400" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-indigo-400 font-display">
+            {stats.in_progress}
+          </p>
+          <span className="text-[10px] text-slate-400 font-mono">Crew dispatched</span>
+        </div>
+
+        {/* Resolved */}
+        <div className="glass-panel p-5 space-y-2 border-white/[0.08] hover:border-emerald-400/40 transition-colors col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase">Resolved</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-emerald-400 font-display">
+            {stats.resolved}
+          </p>
+          <span className="text-[10px] text-emerald-300 font-mono">Completed cases</span>
+        </div>
+
+      </div>
+
+      {/* Recent Submissions Feed */}
+      <div className="glass-panel p-6 space-y-4 border-white/[0.08]">
+        <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+          <div>
+            <h2 className="text-base font-bold text-white font-display">
+              Recent Grievances Stream
+            </h2>
+            <p className="text-xs text-slate-400">
+              Latest citizen reports synced with central database
+            </p>
+          </div>
+
+          <Link
+            to="/authority/complaints"
+            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+          >
+            <span>View all in table</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="divide-y divide-gray-50">
+        <div className="space-y-3">
           {complaints.map((c) => (
-            <div key={c.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-              <span className="text-xl flex-shrink-0">{getCategoryEmoji(c.category)}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{truncate(c.title, 50)}</p>
-                <p className="text-xs text-gray-400 mt-0.5 font-mono">{c.id} • {c.location.split(',')[0]}</p>
+            <div
+              key={c.id}
+              className="bg-[#0B1625]/60 hover:bg-[#0F1D2D]/90 border border-white/[0.06] hover:border-cyan-400/30 rounded-2xl p-4 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-cyan-300">{c.ticket_id || c.id}</span>
+                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-white/[0.05] text-slate-300 border border-white/[0.08]">
+                    {c.category}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                    {c.status}
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-white truncate font-display">{c.title}</p>
+                <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
+                  <MapPin className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                  <span>{c.location}</span>
+                </p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <PriorityBadge priority={c.priority} size="sm" />
-                <StatusBadge status={c.status} size="sm" />
-              </div>
-              <p className="text-xs text-gray-400 flex-shrink-0 hidden lg:block">
-                {formatDateTime(c.submittedAt)}
-              </p>
+
+              <Link
+                to="/authority/complaints"
+                className="self-start sm:self-center px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.08] transition-colors"
+              >
+                Inspect & Update
+              </Link>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Resolution rate bar */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-gray-900">Resolution Rate by Category</h2>
-          <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
-            <TrendingUp className="w-4 h-4" />
-            {summary.resolutionRate}% overall
-          </div>
-        </div>
-        <div className="space-y-3">
-          {[
-            { cat: 'Roads', rate: 68, color: 'bg-red-400' },
-            { cat: 'Garbage', rate: 82, color: 'bg-orange-400' },
-            { cat: 'Drainage', rate: 57, color: 'bg-blue-400' },
-            { cat: 'Water', rate: 74, color: 'bg-cyan-400' },
-            { cat: 'Streetlights', rate: 91, color: 'bg-yellow-400' },
-            { cat: 'Infrastructure', rate: 63, color: 'bg-purple-400' },
-          ].map((item) => (
-            <div key={item.cat} className="flex items-center gap-4">
-              <p className="text-sm text-gray-600 w-24 flex-shrink-0">{item.cat}</p>
-              <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${item.color} transition-all duration-1000`}
-                  style={{ width: `${item.rate}%` }}
-                />
-              </div>
-              <p className="text-sm font-semibold text-gray-700 w-10 text-right">{item.rate}%</p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };

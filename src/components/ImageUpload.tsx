@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, X, Eye, Scan, CheckCircle } from 'lucide-react';
+import { Upload, X, Eye, Scan, CheckCircle2, Sparkles } from 'lucide-react';
 import { analyzeImage } from '../services/aiService';
 import type { ImageAnalysis } from '../types';
 
@@ -7,7 +7,6 @@ interface ImageUploadProps {
   onImageUploaded: (file: File, url: string, analysis?: ImageAnalysis) => void;
 }
 
-/** Drag-and-drop image uploader with Vision AI simulation */
 const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUploaded }) => {
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -54,12 +53,6 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUploaded }) => {
     setUploadedFile(null);
   };
 
-  const severityColor = {
-    High: 'text-red-600 bg-red-50',
-    Medium: 'text-orange-600 bg-orange-50',
-    Low: 'text-green-600 bg-green-50',
-  };
-
   return (
     <div className="space-y-4">
       {!preview ? (
@@ -67,10 +60,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUploaded }) => {
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 cursor-pointer ${
+          className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 cursor-pointer ${
             dragging
-              ? 'border-indigo-500 bg-indigo-50 scale-[1.02]'
-              : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30'
+              ? 'border-cyan-400 bg-cyan-950/30 scale-[1.01]'
+              : 'border-white/[0.12] hover:border-cyan-400/50 bg-white/[0.02] hover:bg-white/[0.04]'
           }`}
         >
           <input
@@ -79,108 +72,70 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUploaded }) => {
             onChange={handleInputChange}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
-          <div className="flex flex-col items-center gap-3">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${dragging ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-              <Upload className={`w-6 h-6 ${dragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+          <div className="flex flex-col items-center gap-2.5">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${dragging ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/[0.05] text-slate-400'}`}>
+              <Upload className="w-5 h-5" />
             </div>
             <div>
-              <p className="font-semibold text-gray-700">Upload an image</p>
-              <p className="text-sm text-gray-500 mt-1">
-                AI can analyze the image to understand the problem
+              <p className="font-semibold text-white text-xs sm:text-sm">Upload Photo Evidence</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                AI Vision will scan and confirm the civic hazard
               </p>
             </div>
-            <p className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+            <p className="text-[10px] text-slate-500 font-mono bg-white/[0.04] px-2.5 py-0.5 rounded-full border border-white/[0.06]">
               PNG, JPG, WEBP — up to 10MB
             </p>
-            {dragging && (
-              <p className="text-indigo-600 font-semibold text-sm animate-bounce">Drop here!</p>
-            )}
           </div>
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Image preview */}
-          <div className="relative rounded-2xl overflow-hidden border border-gray-200">
+          {/* Preview */}
+          <div className="relative rounded-2xl overflow-hidden border border-white/[0.12]">
             <img
               src={preview}
-              alt="Uploaded"
+              alt="Uploaded civic report"
               className="w-full h-48 object-cover"
             />
             <button
+              type="button"
               onClick={clearImage}
-              className="absolute top-3 right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+              className="absolute top-3 right-3 w-7 h-7 bg-rose-600 text-white rounded-full flex items-center justify-center hover:bg-rose-500 transition-colors shadow-lg cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
 
-            {/* Analyzing overlay */}
+            {/* Scanning Overlay */}
             {analyzing && (
-              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3">
+              <div className="absolute inset-0 bg-[#050B14]/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2">
                 <div className="relative">
-                  <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                  <Scan className="w-6 h-6 text-white absolute inset-0 m-auto" />
+                  <div className="w-12 h-12 border-3 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
+                  <Scan className="w-5 h-5 text-cyan-300 absolute inset-0 m-auto" />
                 </div>
-                <p className="text-white font-semibold text-sm">Vision AI Analyzing...</p>
-                <div className="flex gap-1.5">
-                  {['Detecting objects', 'Assessing severity', 'Classifying'].map((step, i) => (
-                    <span key={i} className="text-white/70 text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                      {step}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Simulated bounding box overlay */}
-            {analysis && !analyzing && (
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute border-2 border-yellow-400 rounded-lg" style={{ top: '20%', left: '15%', width: '60%', height: '55%' }}>
-                  <span className="absolute -top-6 left-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-t-lg">
-                    {analysis.detectedObjects[0]}
-                  </span>
-                </div>
+                <p className="text-white font-mono font-bold text-xs tracking-wider">Vision AI Scanning...</p>
               </div>
             )}
           </div>
 
-          {/* Vision AI Analysis Result */}
+          {/* Vision Result Box */}
           {analysis && !analyzing && (
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Scan className="w-4 h-4 text-indigo-600" />
+            <div className="bg-[#0B1625]/90 border border-cyan-400/30 rounded-2xl p-4 space-y-2.5 shadow-glow-cyan text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Scan className="w-4 h-4 text-cyan-400" />
+                  <span className="font-bold text-white font-display">Vision AI Verified</span>
                 </div>
-                <div>
-                  <p className="font-bold text-indigo-900 text-sm">Vision AI Analysis</p>
-                  <p className="text-indigo-600 text-xs">Confidence: {analysis.confidence}%</p>
-                </div>
-                <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                  {analysis.confidence}% Confidence
+                </span>
               </div>
 
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-1">Detected Objects</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {analysis.detectedObjects.map((obj, i) => (
-                      <span key={i} className="text-xs bg-white border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                        {obj}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 pt-2">
-                  <div>
-                    <p className="text-xs text-gray-500">Severity</p>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${severityColor[analysis.severity]}`}>
-                      {analysis.severity}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Suggested Category</p>
-                    <p className="text-sm font-semibold text-indigo-700">{analysis.suggestedCategory}</p>
-                  </div>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-400">Detected:</span>
+                {analysis.detectedObjects.map((obj, i) => (
+                  <span key={i} className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 px-2 py-0.5 rounded-full font-mono text-[10px]">
+                    {obj}
+                  </span>
+                ))}
               </div>
             </div>
           )}

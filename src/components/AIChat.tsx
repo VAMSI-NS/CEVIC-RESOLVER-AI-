@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Bot, User, Send, X, Loader2, Sparkles, AlertCircle,
   CheckCircle2, Clock, MapPin, PlusCircle, Search, HelpCircle,
-  FileText, ExternalLink, ArrowRight, ShieldCheck, ChevronRight
+  FileText, ExternalLink, ArrowRight, ShieldCheck, ChevronRight,
+  MessageSquare, Cpu, CornerDownLeft
 } from 'lucide-react';
 import { getChatResponse, ChatBotResponse } from '../services/aiService';
 import { fetchComplaintByIdApi } from '../services/complaintService';
@@ -29,12 +30,14 @@ const AIChat: React.FC = () => {
     {
       id: 'welcome',
       role: 'assistant',
-      content: "👋 Hello! I'm your **CivicResolve AI Assistant 🤖**.\n\nI can help you report local civic issues, track existing complaints from our PostgreSQL database, or answer any municipal resolution questions.\n\nHow can I help you today?",
+      content: "Hello! 👋\n\n**How can I help you today?**\n\nI'm CivicResolve AI. I can help you report civic issues, track complaints and understand the resolution process.",
       timestamp: new Date().toISOString(),
       quickOptions: [
-        { label: '📝 Report an Issue', text: 'I want to report an issue' },
-        { label: '🔎 Track Complaint', text: 'How do I track my complaint?' },
-        { label: '💡 Civic Help', text: 'What can I report?' },
+        { label: '📝 Report a civic issue', text: 'I want to report an issue' },
+        { label: '🔎 Track my complaint', text: 'How do I track my complaint?' },
+        { label: '🛣️ How do I report a pothole?', text: 'How do I report a pothole?' },
+        { label: '📊 Check complaint status', text: 'What does Under Review mean?' },
+        { label: '💡 What issues can I report?', text: 'What can I report?' },
       ],
     },
   ]);
@@ -49,7 +52,6 @@ const AIChat: React.FC = () => {
     }
   }, [messages, loading, open]);
 
-  /** Process incoming user text */
   const handleSend = async (textToSend?: string) => {
     const rawText = textToSend !== undefined ? textToSend : input;
     const text = rawText.trim();
@@ -75,19 +77,10 @@ const AIChat: React.FC = () => {
         const foundComplaint = await fetchComplaintByIdApi(ticketId);
 
         if (foundComplaint) {
-          const statusColors: Record<string, string> = {
-            REGISTERED: 'bg-amber-100 text-amber-800 border-amber-300',
-            UNDER_REVIEW: 'bg-blue-100 text-blue-800 border-blue-300',
-            ASSIGNED: 'bg-purple-100 text-purple-800 border-purple-300',
-            IN_PROGRESS: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-            RESOLVED: 'bg-green-100 text-green-800 border-green-300',
-            REJECTED: 'bg-red-100 text-red-800 border-red-300',
-          };
-
           const assistantMsg: ExtendedChatMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: `✅ **Complaint ${ticketId} Found in PostgreSQL!**\n\nComplaint **${ticketId}** is currently **${foundComplaint.status.replace('_', ' ')}**.\n\n• 📌 **Title:** ${foundComplaint.title}\n• 🏷️ **Category:** ${foundComplaint.category}\n• ⚡ **Priority:** ${foundComplaint.priority}\n• 📍 **Location:** ${foundComplaint.location}\n• 🏢 **Authority:** ${foundComplaint.department || 'Municipal Authority'}`,
+            content: `✅ **Complaint ${ticketId} Found in PostgreSQL!**\n\nComplaint **${ticketId}** is currently **${foundComplaint.status.replace('_', ' ')}**.\n\n• 📌 **Title:** ${foundComplaint.title}\n• 🏷️ **Category:** ${foundComplaint.category}\n• ⚡ **Priority:** ${foundComplaint.priority}\n• 📍 **Location:** ${foundComplaint.location}\n• 🏢 **Authority:** ${foundComplaint.department || 'Municipal Operations'}`,
             timestamp: new Date().toISOString(),
             complaintData: foundComplaint,
             suggestTracking: true,
@@ -126,13 +119,13 @@ const AIChat: React.FC = () => {
 
         setMessages((prev) => [...prev, assistantMsg]);
       }
-    } catch (err: any) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: 'Sorry, I encountered an issue connecting to the service. Please try again or use the main menu options.',
+          content: 'Sorry, I encountered an issue connecting to the database. Please try again.',
           timestamp: new Date().toISOString(),
           quickOptions: [
             { label: '📝 Report Issue', text: 'I want to report an issue' },
@@ -152,7 +145,6 @@ const AIChat: React.FC = () => {
     }
   };
 
-  /** Render simple markdown formatting */
   const renderMarkdown = (text: string) => {
     const lines = text.split('\n');
     return (
@@ -160,17 +152,16 @@ const AIChat: React.FC = () => {
         {lines.map((line, idx) => {
           if (!line.trim()) return <div key={idx} className="h-1.5" />;
           
-          // Bold matches
           const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
           return (
             <p key={idx} className="leading-relaxed">
               {parts.map((part, pIdx) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
-                  return <strong key={pIdx} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+                  return <strong key={pIdx} className="font-bold text-white">{part.slice(2, -2)}</strong>;
                 }
                 if (part.startsWith('`') && part.endsWith('`')) {
                   return (
-                    <code key={pIdx} className="bg-indigo-50 text-indigo-700 font-mono text-xs px-1.5 py-0.5 rounded border border-indigo-200">
+                    <code key={pIdx} className="bg-cyan-500/10 text-cyan-300 font-mono text-xs px-1.5 py-0.5 rounded border border-cyan-500/20">
                       {part.slice(1, -1)}
                     </code>
                   );
@@ -186,215 +177,221 @@ const AIChat: React.FC = () => {
 
   return (
     <>
-      {/* Floating Bottom-Right Launcher Button */}
+      {/* Floating Bottom-Right Launcher Button with Pulse Glow */}
       <button
         onClick={() => setOpen(true)}
         aria-label="Open CivicResolve AI Assistant"
-        className={`fixed bottom-6 right-6 z-50 group flex items-center gap-2.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white px-4 py-3.5 rounded-full shadow-2xl hover:shadow-indigo-500/40 hover:scale-105 active:scale-95 transition-all duration-300 border border-white/20 ${
+        className={`fixed bottom-6 right-6 z-50 group flex items-center gap-3 bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 text-white px-5 py-3.5 rounded-full shadow-glow-cyan hover:shadow-glow-mixed hover:scale-105 active:scale-95 transition-all duration-300 border border-white/20 cursor-pointer ${
           open ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'
         }`}
       >
         <div className="relative">
-          <div className="w-7 h-7 bg-white/20 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
             <Bot className="w-4 h-4 text-white" />
           </div>
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-indigo-700 animate-pulse" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-[#050B14] animate-pulse" />
         </div>
         <div className="text-left hidden sm:block">
-          <p className="text-xs font-bold leading-tight">CivicResolve AI</p>
-          <p className="text-[10px] text-indigo-200 font-medium">Assistant 🤖</p>
+          <p className="text-xs font-extrabold leading-tight font-display tracking-wide">CivicResolve AI</p>
+          <p className="text-[10px] text-cyan-200 font-mono">Assistant 🤖</p>
         </div>
       </button>
 
-      {/* Modern Chat Window */}
+      {/* Glassmorphism AI Modal / Center Panel */}
       {open && (
-        <div
-          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[92vw] sm:w-[410px] bg-white rounded-3xl shadow-2xl border border-gray-200/80 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300"
-          style={{ height: '580px', maxHeight: '88vh' }}
-        >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-indigo-900 px-4 py-3.5 flex items-center justify-between border-b border-indigo-800/40 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-inner border border-white/20">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-white font-bold text-sm tracking-wide">CivicResolve AI Assistant</h3>
-                  <span className="text-sm">🤖</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+          
+          {/* Main Glass Chat Panel */}
+          <div
+            className="w-full max-w-2xl bg-[#07111F]/90 border border-white/[0.12] backdrop-blur-2xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 relative"
+            style={{ height: '620px', maxHeight: '90vh' }}
+          >
+            {/* Header */}
+            <div className="bg-[#050B14]/80 px-6 py-4 flex items-center justify-between border-b border-white/[0.08] relative z-10">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-violet-600 flex items-center justify-center shadow-glow-cyan border border-white/20">
+                  <Sparkles className="w-5 h-5 text-white" />
                 </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                  <span className="text-emerald-300 text-[11px] font-medium">PostgreSQL Connected</span>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-colors"
-              aria-label="Close Chat"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Quick Action Bar */}
-          <div className="bg-slate-50 border-b border-gray-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => handleSend('I want to report an issue')}
-              className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold bg-white hover:bg-indigo-50 hover:text-indigo-600 text-gray-700 px-2.5 py-1.5 rounded-full border border-gray-200 shadow-2xs transition-all"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Report Issue</span>
-            </button>
-            <button
-              onClick={() => handleSend('How do I track my complaint?')}
-              className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold bg-white hover:bg-indigo-50 hover:text-indigo-600 text-gray-700 px-2.5 py-1.5 rounded-full border border-gray-200 shadow-2xs transition-all"
-            >
-              <Search className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Track Ticket</span>
-            </button>
-            <button
-              onClick={() => handleSend('What can I report?')}
-              className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold bg-white hover:bg-indigo-50 hover:text-indigo-600 text-gray-700 px-2.5 py-1.5 rounded-full border border-gray-200 shadow-2xs transition-all"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Civic Help</span>
-            </button>
-          </div>
-
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-white to-slate-50/50">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-              >
-                {/* Avatar */}
-                <div
-                  className={`w-7 h-7 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-bold shadow-2xs ${
-                    msg.role === 'assistant'
-                      ? 'bg-gradient-to-tr from-indigo-600 to-purple-600 text-white'
-                      : 'bg-slate-700 text-white'
-                  }`}
-                >
-                  {msg.role === 'assistant' ? <Bot className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
-                </div>
-
-                {/* Message Bubble */}
-                <div className={`max-w-[85%] space-y-2.5`}>
-                  <div
-                    className={`px-3.5 py-2.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-2xs ${
-                      msg.role === 'assistant'
-                        ? 'bg-white text-gray-800 border border-gray-200/90 rounded-tl-sm'
-                        : 'bg-indigo-600 text-white rounded-tr-sm'
-                    }`}
-                  >
-                    {renderMarkdown(msg.content)}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-white font-extrabold text-base tracking-tight font-display">CivicResolve AI Assistant</h3>
+                    <span className="text-sm">🤖</span>
                   </div>
-
-                  {/* Complaint Card if retrieved from PostgreSQL */}
-                  {msg.complaintData && (
-                    <div className="bg-white border border-indigo-100 rounded-2xl p-3 shadow-sm space-y-2">
-                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                        <span className="font-mono text-xs font-bold text-indigo-700">{msg.complaintData.ticket_id || msg.complaintData.id}</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200">
-                          {msg.complaintData.status}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-gray-600 space-y-1">
-                        <p className="font-medium text-gray-800 line-clamp-1">📌 {msg.complaintData.title}</p>
-                        <p className="flex items-center gap-1 text-gray-500">
-                          <MapPin className="w-3 h-3 text-red-500 flex-shrink-0" />
-                          <span className="truncate">{msg.complaintData.location}</span>
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigate(`/track?id=${msg.complaintData?.ticket_id || msg.complaintData?.id}`);
-                          setOpen(false);
-                        }}
-                        className="w-full flex items-center justify-center gap-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl transition-all shadow-sm"
-                      >
-                        <span>View Live Timeline</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Direct Action Button: Report Issue CTA */}
-                  {msg.suggestComplaint && !msg.complaintData && (
-                    <button
-                      onClick={() => {
-                        navigate('/report', {
-                          state: { initialDescription: msg.userPromptText || '' },
-                        });
-                        setOpen(false);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold py-2.5 rounded-xl shadow-md transition-all active:scale-98"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Report This Issue Now</span>
-                    </button>
-                  )}
-
-                  {/* Quick Option Pills */}
-                  {msg.quickOptions && msg.quickOptions.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {msg.quickOptions.map((opt, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => handleSend(opt.text)}
-                          className="text-[11px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-2.5 py-1 rounded-full transition-all flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>{opt.label}</span>
-                          <ChevronRight className="w-3 h-3 text-indigo-400" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className="text-emerald-300 text-xs font-mono">PostgreSQL Cloud Connected</span>
+                  </div>
                 </div>
               </div>
-            ))}
 
-            {/* Typing Indicator */}
-            {loading && (
-              <div className="flex gap-2.5">
-                <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shadow-2xs">
-                  <Bot className="w-3.5 h-3.5" />
-                </div>
-                <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 shadow-2xs">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-bounce" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-bounce [animation-delay:0.4s]" />
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Chat Input */}
-          <div className="bg-white border-t border-gray-100 p-3">
-            <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-2xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent focus-within:bg-white transition-all">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask civic question or enter Ticket ID (e.g. CR-2026-000001)..."
-                className="flex-1 bg-transparent text-xs sm:text-sm text-gray-800 placeholder-gray-400 focus:outline-none py-1"
-                disabled={loading}
-              />
               <button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || loading}
-                className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl flex items-center justify-center transition-all flex-shrink-0 shadow-sm"
-                aria-label="Send Message"
+                onClick={() => setOpen(false)}
+                className="w-9 h-9 rounded-xl bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.08] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Close Assistant"
               >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Quick Action Pills Top Bar */}
+            <div className="bg-white/[0.02] border-b border-white/[0.06] px-4 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => handleSend('I want to report an issue')}
+                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-white/[0.04] hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 border border-white/[0.08] hover:border-cyan-500/30 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Report Issue</span>
+              </button>
+              <button
+                onClick={() => handleSend('How do I track my complaint?')}
+                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-white/[0.04] hover:bg-indigo-500/15 text-slate-300 hover:text-indigo-300 border border-white/[0.08] hover:border-indigo-500/30 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+              >
+                <Search className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Track Ticket</span>
+              </button>
+              <button
+                onClick={() => handleSend('What can I report?')}
+                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-white/[0.04] hover:bg-violet-500/15 text-slate-300 hover:text-violet-300 border border-white/[0.08] hover:border-violet-500/30 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-violet-400" />
+                <span>Civic Help</span>
+              </button>
+            </div>
+
+            {/* Messages Scroll Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-[#07111F]/60 to-[#050B14]/80">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                >
+                  {/* Avatar */}
+                  <div
+                    className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-bold shadow-sm ${
+                      msg.role === 'assistant'
+                        ? 'bg-gradient-to-tr from-cyan-500 to-violet-600 text-white shadow-glow-cyan'
+                        : 'bg-white/[0.10] border border-white/[0.12] text-slate-200'
+                    }`}
+                  >
+                    {msg.role === 'assistant' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                  </div>
+
+                  {/* Message Body */}
+                  <div className="max-w-[85%] space-y-3">
+                    <div
+                      className={`px-4 py-3 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                        msg.role === 'assistant'
+                          ? 'bg-[#0B1625]/80 text-slate-200 border border-white/[0.08] rounded-tl-sm backdrop-blur-md'
+                          : 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white rounded-tr-sm shadow-glow-cyan'
+                      }`}
+                    >
+                      {renderMarkdown(msg.content)}
+                    </div>
+
+                    {/* Real PostgreSQL Complaint Card */}
+                    {msg.complaintData && (
+                      <div className="bg-[#0B1625]/90 border border-cyan-400/30 rounded-2xl p-4 shadow-glow-cyan space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
+                          <span className="font-mono text-xs font-bold text-cyan-300">{msg.complaintData.ticket_id || msg.complaintData.id}</span>
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 bg-cyan-500/10 text-cyan-300 rounded-full border border-cyan-500/30">
+                            {msg.complaintData.status}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-300 space-y-1">
+                          <p className="font-medium text-white line-clamp-1">📌 {msg.complaintData.title}</p>
+                          <p className="flex items-center gap-1.5 text-slate-400">
+                            <MapPin className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                            <span className="truncate">{msg.complaintData.location}</span>
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigate(`/track?id=${msg.complaintData?.ticket_id || msg.complaintData?.id}`);
+                            setOpen(false);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 text-xs font-bold bg-gradient-to-r from-cyan-500 to-indigo-600 text-white py-2.5 rounded-xl shadow-glow-cyan transition-all hover:scale-[1.02] cursor-pointer"
+                        >
+                          <span>View Live Timeline</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Direct CTA: Report Issue */}
+                    {msg.suggestComplaint && !msg.complaintData && (
+                      <button
+                        onClick={() => {
+                          navigate('/report', {
+                            state: { initialDescription: msg.userPromptText || '' },
+                          });
+                          setOpen(false);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 text-white text-xs font-bold py-3 rounded-xl shadow-glow-cyan transition-all hover:scale-[1.02] cursor-pointer"
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Report This Issue Now</span>
+                      </button>
+                    )}
+
+                    {/* Suggestion Chips */}
+                    {msg.quickOptions && msg.quickOptions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {msg.quickOptions.map((opt, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleSend(opt.text)}
+                            className="text-xs font-semibold bg-white/[0.04] hover:bg-cyan-500/15 text-slate-300 hover:text-cyan-300 border border-white/[0.08] hover:border-cyan-400/30 px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>{opt.label}</span>
+                            <ChevronRight className="w-3 h-3 text-cyan-400/60" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Typing Indicator */}
+              {loading && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-violet-600 text-white flex items-center justify-center text-xs shadow-glow-cyan">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div className="bg-[#0B1625]/80 border border-white/[0.08] rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 shadow-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Area */}
+            <div className="bg-[#050B14]/90 border-t border-white/[0.08] p-4">
+              <div className="flex items-center gap-2 bg-[#07111F] border border-white/[0.12] focus-within:border-cyan-400/80 focus-within:ring-1 focus-within:ring-cyan-400/50 rounded-2xl px-4 py-2 transition-all">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask me anything or enter Ticket ID (e.g. CR-2026-000001)..."
+                  className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none py-1.5"
+                  disabled={loading}
+                />
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || loading}
+                  className="w-9 h-9 bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 disabled:opacity-30 text-white rounded-xl flex items-center justify-center transition-all flex-shrink-0 shadow-glow-cyan cursor-pointer"
+                  aria-label="Send Message"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

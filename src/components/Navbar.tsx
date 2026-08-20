@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  MapPin, Bell, Menu, X, ChevronDown, Shield,
-  Home, AlertCircle, Search, Info, LogIn
+  Sparkles, Bell, Menu, X, Shield, Home, AlertCircle, Search, Info, PlusCircle, ArrowRight
 } from 'lucide-react';
 import NotificationPanel from './NotificationPanel';
 
@@ -10,7 +9,6 @@ interface NavbarProps {
   notifications?: number;
 }
 
-/** Top navigation bar with logo, links, notification bell */
 const Navbar: React.FC<NavbarProps> = ({ notifications = 0 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -19,7 +17,7 @@ const Navbar: React.FC<NavbarProps> = ({ notifications = 0 }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 10);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -27,113 +25,149 @@ const Navbar: React.FC<NavbarProps> = ({ notifications = 0 }) => {
   const isActive = (path: string) => location.pathname === path;
 
   const navLinks = [
-    { label: 'Home', path: '/', icon: <Home className="w-4 h-4" /> },
-    { label: 'How It Works', path: '/how-it-works', icon: <Info className="w-4 h-4" /> },
-    { label: 'Report Issue', path: '/report', icon: <AlertCircle className="w-4 h-4" /> },
-    { label: 'Track Complaint', path: '/track', icon: <Search className="w-4 h-4" /> },
+    { label: 'Home', path: '/' },
+    { label: 'Report Issue', path: '/report' },
+    { label: 'Track Complaint', path: '/track' },
+    { label: 'How It Works', path: '/how-it-works' },
   ];
 
   const handleNotifClose = useCallback(() => setNotifOpen(false), []);
 
   return (
-    <nav className={`fixed top-9 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-md border-b border-gray-100' : 'bg-white/90 backdrop-blur-sm'}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <header className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 pt-3 pb-2 transition-all duration-300 pointer-events-none">
+      <div
+        className={`max-w-7xl mx-auto rounded-2xl transition-all duration-300 pointer-events-auto ${
+          scrolled
+            ? 'bg-[#07111F]/90 backdrop-blur-xl border border-white/[0.12] shadow-2xl shadow-black/40 px-4 sm:px-6'
+            : 'bg-[#07111F]/60 backdrop-blur-md border border-white/[0.08] px-4 sm:px-6'
+        }`}
+      >
         <div className="flex items-center justify-between h-16">
-
+          
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-              <MapPin className="w-5 h-5 text-white" />
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-violet-600 flex items-center justify-center shadow-glow-cyan group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div className="leading-tight">
-              <span className="font-bold text-gray-900 text-base">CivicResolve</span>
-              <span className="font-bold text-indigo-600 text-base"> AI</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-white text-base tracking-tight font-display">CivicResolve</span>
+                <span className="font-extrabold text-cyan-400 text-base tracking-tight font-display">AI</span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium hidden sm:block">Smart City Platform</p>
             </div>
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-1">
+          {/* Desktop Nav Links */}
+          <nav className="hidden md:flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-2 py-1">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                   isActive(link.path)
-                    ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
+                    : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
                 }`}
               >
                 {link.label}
               </Link>
             ))}
-          </div>
+          </nav>
 
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
-            {/* Notification bell */}
+          {/* Right Action Buttons */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Notification Bell */}
             <div className="relative">
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="relative p-2.5 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-all"
+                className="relative p-2 rounded-xl text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all"
+                aria-label="Notifications"
               >
-                <Bell className="w-5 h-5" />
+                <Bell className="w-4 h-4" />
                 {notifications > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-cyan-400 rounded-full ring-2 ring-[#07111F] animate-pulse" />
                 )}
               </button>
               {notifOpen && <NotificationPanel onClose={handleNotifClose} />}
             </div>
 
-            {/* Authority Login */}
+            {/* Authority Console Shortcut */}
             <button
-              onClick={() => navigate('/authority')}
-              className="hidden md:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+              onClick={() => navigate('/admin')}
+              className="hidden lg:flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all"
             >
-              <Shield className="w-4 h-4" />
-              Authority Login
+              <Shield className="w-3.5 h-3.5 text-violet-400" />
+              <span>Authority Portal</span>
             </button>
 
-            {/* Mobile menu */}
+            {/* Main Action: Report Button */}
+            <Link
+              to="/report"
+              className="hidden sm:inline-flex items-center gap-2 text-xs font-bold text-white px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 shadow-glow-cyan transition-all hover:scale-105 active:scale-95"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Report Issue</span>
+            </Link>
+
+            {/* Mobile menu toggle */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="md:hidden p-2.5 rounded-xl text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-all"
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all"
+              aria-label="Toggle Navigation Menu"
             >
               {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
+
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile Drawer */}
       {menuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 shadow-lg animate-slide-up">
-          <div className="px-4 py-3 space-y-1">
+        <div className="md:hidden max-w-7xl mx-auto mt-2 rounded-2xl bg-[#07111F]/95 backdrop-blur-2xl border border-white/[0.12] p-4 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-auto">
+          <div className="space-y-1.5">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
                 onClick={() => setMenuOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   isActive(link.path)
-                    ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                    : 'text-slate-300 hover:bg-white/[0.06]'
                 }`}
               >
-                {link.icon}
-                {link.label}
+                <span>{link.label}</span>
+                <ArrowRight className="w-3.5 h-3.5 opacity-50" />
               </Link>
             ))}
-            <button
-              onClick={() => { navigate('/authority'); setMenuOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-indigo-50 text-indigo-700"
-            >
-              <Shield className="w-4 h-4" />
-              Authority Dashboard
-            </button>
+
+            <div className="pt-2 mt-2 border-t border-white/[0.08] space-y-2">
+              <Link
+                to="/report"
+                onClick={() => setMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-violet-600 text-white font-bold text-sm py-3 rounded-xl shadow-glow-cyan"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Report an Issue</span>
+              </Link>
+
+              <button
+                onClick={() => {
+                  navigate('/admin');
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.10] text-slate-200 font-semibold text-sm py-2.5 rounded-xl"
+              >
+                <Shield className="w-4 h-4 text-violet-400" />
+                <span>Authority Console</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </nav>
+    </header>
   );
 };
 

@@ -1,130 +1,143 @@
 import React, { useState } from 'react';
-import { Shield, Lock, User, ArrowRight, Loader2, KeyRound, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Shield, Lock, User, Sparkles, ArrowRight,
+  AlertCircle, Loader2
+} from 'lucide-react';
 import { adminLoginApi } from '../../services/complaintService';
 
 interface AdminLoginPageProps {
   onLoginSuccess?: () => void;
+  onSuccess?: () => void;
 }
 
-const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }) => {
+const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess, onSuccess }) => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError('Please enter both username and password.');
+      setError('Please enter both username and password');
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError(null);
 
     try {
       const res = await adminLoginApi({ username: username.trim(), password: password.trim() });
       if (res.success) {
         if (onLoginSuccess) onLoginSuccess();
-        else window.location.reload();
+        else if (onSuccess) onSuccess();
+        else navigate('/admin/complaints');
       } else {
-        setError(res.message || 'Invalid admin credentials. Please try again.');
+        setError(res.message || 'Invalid admin credentials. Use admin / admin123');
       }
-    } catch (err: any) {
-      setError('Authentication failed. Please check your connection.');
+    } catch {
+      setError('Authentication request failed. Please retry.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        {/* Logo / Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/20 border border-indigo-400/30">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">CivicResolve AI</h1>
-          <p className="text-indigo-300/80 text-xs font-semibold uppercase tracking-widest mt-1">
-            Host / Authority Administrator Portal
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#050B14] text-[#F8FAFC] flex items-center justify-center p-4 smart-city-grid relative">
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Login Card */}
-        <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl text-white">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-white">Secure Host Sign In</h2>
-            <p className="text-xs text-gray-300 mt-1">
-              Sign in to manage PostgreSQL civic complaints, update resolution statuses, and view citizen details.
+      <div className="max-w-md w-full relative z-10">
+        <div className="glass-panel p-8 sm:p-10 space-y-6 border-white/[0.12] shadow-2xl">
+          <div className="text-center space-y-2">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-violet-600 flex items-center justify-center mx-auto shadow-glow-cyan">
+              <Shield className="w-7 h-7 text-white" />
+            </div>
+
+            <h1 className="text-2xl font-black text-white font-display tracking-tight mt-3">
+              Civic Operations Center
+            </h1>
+            <p className="text-xs text-slate-400 font-mono">
+              Municipal Authority & Host Portal
             </p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl flex items-center gap-2 text-xs text-red-200">
-              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-200 mb-1.5">
-                Admin Username
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-300">
+                Officer Username
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <User className="w-4 h-4" />
+                </div>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="glass-input pl-10"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-200 mb-1.5">
-                Admin Password
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-300">
+                Access Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <Lock className="w-4 h-4" />
+                </div>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  placeholder="admin123"
+                  className="glass-input pl-10"
                 />
               </div>
-              <p className="text-[11px] text-indigo-300/70 mt-1">Default credentials: <code className="bg-white/10 px-1 rounded">admin</code> / <code className="bg-white/10 px-1 rounded">admin123</code></p>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 transition-all text-sm mt-6 disabled:opacity-50"
+              className="w-full py-4 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-cyan-500 via-indigo-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 shadow-glow-cyan transition-all hover:scale-[1.02] active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-2"
             >
               {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Verifying Credentials...
-                </>
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <KeyRound className="w-4 h-4" />
-                  Authenticate as Host/Admin
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  <span>Authenticate & Access Center</span>
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-white/10 text-center">
-            <a href="/" className="text-xs text-indigo-300 hover:text-white transition-colors">
-              ← Return to Citizen Portal
-            </a>
+          <div className="bg-[#0B1625]/80 border border-white/[0.08] rounded-xl p-3 text-center text-xs text-slate-400 font-mono">
+            <span>Default Access: </span>
+            <span className="text-cyan-300 font-bold">admin</span>
+            <span> / </span>
+            <span className="text-cyan-300 font-bold">admin123</span>
+          </div>
+
+          <div className="text-center pt-2">
+            <button
+              onClick={() => navigate('/')}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+            >
+              ← Back to Citizen Portal
+            </button>
           </div>
         </div>
       </div>

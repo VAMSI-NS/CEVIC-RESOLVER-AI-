@@ -1,570 +1,503 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Search, ChevronDown, Eye, MapPin, Building2, Clock, X,
-  Loader2, RefreshCw, User, Phone, Mail, FileText, CheckCircle,
-  AlertTriangle, Shield, Check, Calendar
+  Search, Filter, Eye, RefreshCw, CheckCircle2, Clock,
+  MapPin, User, Phone, Mail, Building2, Tag, Zap, AlertCircle,
+  X, ArrowRight, Shield, Sparkles, Check, ChevronDown, Compass
 } from 'lucide-react';
-import PriorityBadge from '../../components/PriorityBadge';
-import StatusBadge from '../../components/StatusBadge';
-import ComplaintTimeline from '../../components/ComplaintTimeline';
-import Modal from '../../components/Modal';
-import {
-  getAllComplaints,
-  fetchAllComplaintsApi,
-  updateComplaintStatusApi,
-  fetchDashboardStatsApi,
-} from '../../services/complaintService';
-import type { Complaint, Priority, ComplaintStatus, Category } from '../../types';
-import { formatDateTime, getCategoryEmoji, truncate } from '../../utils/helpers';
-import { useToast, ToastContainer } from '../../components/Toast';
+import { fetchAllComplaintsApi, updateComplaintStatusApi } from '../../services/complaintService';
+import type { Complaint, Category, Priority, ComplaintStatus } from '../../types';
 
-// ============================================================
-// Host / Admin Dashboard - Complaints Management Page
-// ============================================================
-
-type FilterState = {
-  search: string;
-  category: Category | 'All';
-  priority: Priority | 'All';
-  status: ComplaintStatus | 'All';
-  dateFilter: 'All' | 'Today' | 'ThisWeek' | 'ThisMonth';
-};
-
-const CATEGORIES: (Category | 'All')[] = [
-  'All', 'Roads', 'Garbage', 'Drainage', 'Water', 'Streetlights', 'Electricity', 'Infrastructure', 'Other'
-];
-const PRIORITIES: (Priority | 'All')[] = ['All', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
-const STATUSES: (ComplaintStatus | 'All')[] = [
-  'All', 'REGISTERED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'
+const allStatuses: ComplaintStatus[] = [
+  'REGISTERED',
+  'UNDER_REVIEW',
+  'ASSIGNED',
+  'IN_PROGRESS',
+  'RESOLVED',
+  'REJECTED',
 ];
 
 const ComplaintsPage: React.FC = () => {
-  const { toasts, addToast, dismissToast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [selected, setSelected] = useState<Complaint | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [updating, setUpdating] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [stats, setStats] = useState<any>({
-    total: 0,
-    registered: 0,
-    under_review: 0,
-    assigned: 0,
-    in_progress: 0,
-    resolved: 0,
-    rejected: 0,
-    critical: 0,
-    high: 0,
-  });
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    category: 'All',
-    priority: 'All',
-    status: 'All',
-    dateFilter: 'All',
-  });
-
-  const loadData = async (showToast = false) => {
-    setLoading(true);
+  const loadComplaints = async () => {
     try {
-      const [freshComplaints, freshStats] = await Promise.all([
-        fetchAllComplaintsApi(),
-        fetchDashboardStatsApi(),
-      ]);
-
-      if (freshComplaints) setComplaints(freshComplaints);
-      if (freshStats) setStats(freshStats);
-
-      if (showToast) {
-        addToast('Synced latest complaints from PostgreSQL', 'success');
-      }
-    } catch (err: any) {
-      console.warn('Sync error:', err);
-      setComplaints(getAllComplaints());
+      const data = await fetchAllComplaintsApi();
+      setComplaints(data);
+    } catch {
+      // Fallback
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    // Auto-refresh every 12 seconds
-    let interval: any;
-    if (autoRefresh) {
-      interval = setInterval(() => {
-        loadData(false);
-      }, 12000);
-    }
+    loadComplaints();
+  }, []);
+
+  // Auto-refresh interval (12 seconds)
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      loadComplaints();
+    }, 12000);
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  const filtered = complaints.filter((c) => {
-    const s = filters.search.toLowerCase().trim();
-    if (s) {
-      const matchId = (c.id || '').toLowerCase().includes(s);
-      const matchTitle = (c.title || '').toLowerCase().includes(s);
-      const matchCitizen = (c.citizen_name || c.citizenName || '').toLowerCase().includes(s);
-      const matchPhone = (c.phone || '').toLowerCase().includes(s);
-      const matchEmail = (c.email || '').toLowerCase().includes(s);
-      const matchLocation = (c.location || '').toLowerCase().includes(s);
-      if (!matchId && !matchTitle && !matchCitizen && !matchPhone && !matchEmail && !matchLocation) {
-        return false;
-      }
-    }
+  const handleStatusChange = async (newStatus: string) => {
+    if (!selectedComplaint) return;
+    setUpdatingStatus(true);
+    const targetId = selectedComplaint.ticket_id || selectedComplaint.id;
 
-    if (filters.category !== 'All' && c.category !== filters.category) return false;
-    if (filters.priority !== 'All' && c.priority !== filters.priority) return false;
-    if (filters.status !== 'All' && c.status !== filters.status) return false;
-
-    if (filters.dateFilter !== 'All') {
-      const date = new Date(c.submittedAt).getTime();
-      const now = Date.now();
-      const dayMs = 24 * 60 * 60 * 1000;
-      if (filters.dateFilter === 'Today' && now - date > dayMs) return false;
-      if (filters.dateFilter === 'ThisWeek' && now - date > 7 * dayMs) return false;
-      if (filters.dateFilter === 'ThisMonth' && now - date > 30 * dayMs) return false;
-    }
-
-    return true;
-  });
-
-  const handleStatusUpdate = async (ticketId: string, newStatus: string) => {
-    setUpdating(true);
     try {
-      const updated = await updateComplaintStatusApi(ticketId, newStatus);
+      const updated = await updateComplaintStatusApi(targetId, newStatus);
       if (updated) {
-        setComplaints((prev) => prev.map((c) => (c.id === ticketId ? updated : c)));
-        setSelected(updated);
-        addToast(`Complaint ${ticketId} status updated to "${newStatus}" in PostgreSQL!`, 'success');
-        // Refresh stats
-        const freshStats = await fetchDashboardStatsApi();
-        if (freshStats) setStats(freshStats);
+        setSelectedComplaint(updated);
+        setComplaints((prev) =>
+          prev.map((c) => ((c.ticket_id || c.id) === targetId ? updated : c))
+        );
+        setActionSuccess(`Status updated to ${newStatus} in PostgreSQL!`);
+        setTimeout(() => setActionSuccess(null), 3000);
       }
-    } catch (err: any) {
-      addToast(`Status update failed: ${err.message}`, 'error');
+    } catch {
+      alert('Failed to update status in database. Please retry.');
     } finally {
-      setUpdating(false);
+      setUpdatingStatus(false);
     }
   };
 
-  const setFilter = (key: keyof FilterState, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  // Filter complaints
+  const filtered = complaints.filter((c) => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      !term ||
+      c.title.toLowerCase().includes(term) ||
+      (c.ticket_id || c.id).toLowerCase().includes(term) ||
+      (c.citizen_name || c.citizenName || '').toLowerCase().includes(term) ||
+      (c.phone || '').toLowerCase().includes(term) ||
+      (c.email || '').toLowerCase().includes(term) ||
+      c.location.toLowerCase().includes(term);
+
+    const matchesCategory = categoryFilter === 'ALL' || c.category === categoryFilter;
+    const matchesPriority = priorityFilter === 'ALL' || c.priority === priorityFilter;
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      c.status.toUpperCase().replace(/[\s-]/g, '_') === statusFilter.toUpperCase().replace(/[\s-]/g, '_');
+
+    return matchesSearch && matchesCategory && matchesPriority && matchesStatus;
+  });
+
+  const getStatusBadge = (status: string) => {
+    const s = (status || 'REGISTERED').toUpperCase().replace(/[\s-]/g, '_');
+    if (s.includes('RESOLV')) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+    if (s.includes('PROGRESS')) return 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30';
+    if (s.includes('ASSIGN')) return 'bg-purple-500/10 text-purple-300 border-purple-500/30';
+    if (s.includes('REVIEW')) return 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30';
+    if (s.includes('REJECT')) return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+    return 'bg-amber-500/10 text-amber-300 border-amber-500/30';
+  };
+
+  const getPriorityBadge = (p: string) => {
+    switch (p) {
+      case 'CRITICAL': return 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+      case 'HIGH': return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+      case 'MEDIUM': return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+      default: return 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+    }
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-
-      {/* Header & Live Status */}
+    <div className="space-y-6 max-w-7xl mx-auto">
+      
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-            <Shield className="w-6 h-6 text-indigo-600" />
-            Host / Admin Complaint Center
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">
+            PostgreSQL Central Database Table
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-white font-display tracking-tight mt-0.5">
+            Complaints Management Table
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5">
-            Central PostgreSQL database storage & multi-user complaint monitoring
+          <p className="text-xs text-slate-400">
+            Inspect, search, and update resolution lifecycle of all registered citizen grievances
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-gray-600 bg-white border border-gray-200 px-3 py-2 rounded-xl cursor-pointer select-none shadow-sm">
+          <label className="flex items-center gap-2 text-xs text-slate-400 bg-white/[0.04] border border-white/[0.08] px-3 py-2 rounded-xl cursor-pointer">
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+              className="rounded bg-[#07111F] text-cyan-500"
             />
             <span>Auto-Refresh (12s)</span>
           </label>
 
           <button
-            onClick={() => loadData(true)}
-            disabled={loading}
-            className="btn-secondary flex items-center gap-2 text-xs py-2 px-3 shadow-sm bg-white hover:bg-gray-50"
+            onClick={loadComplaints}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white text-xs font-bold shadow-glow-cyan transition-all cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Sync PostgreSQL</span>
           </button>
         </div>
       </div>
 
-      {/* Live Statistics Cards (from PostgreSQL) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-3.5 shadow-sm">
-          <span className="text-xs font-semibold text-gray-400">Total</span>
-          <p className="text-xl font-extrabold text-gray-900 mt-0.5">{stats.total || complaints.length}</p>
-        </div>
-        <div className="bg-blue-50/50 rounded-2xl border border-blue-100 p-3.5">
-          <span className="text-xs font-semibold text-blue-600">Registered</span>
-          <p className="text-xl font-extrabold text-blue-700 mt-0.5">{stats.registered || 0}</p>
-        </div>
-        <div className="bg-purple-50/50 rounded-2xl border border-purple-100 p-3.5">
-          <span className="text-xs font-semibold text-purple-600">Under Review</span>
-          <p className="text-xl font-extrabold text-purple-700 mt-0.5">{stats.under_review || 0}</p>
-        </div>
-        <div className="bg-amber-50/50 rounded-2xl border border-amber-100 p-3.5">
-          <span className="text-xs font-semibold text-amber-600">In Progress</span>
-          <p className="text-xl font-extrabold text-amber-700 mt-0.5">{stats.in_progress || 0}</p>
-        </div>
-        <div className="bg-green-50/50 rounded-2xl border border-green-100 p-3.5">
-          <span className="text-xs font-semibold text-green-600">Resolved</span>
-          <p className="text-xl font-extrabold text-green-700 mt-0.5">{stats.resolved || 0}</p>
-        </div>
-        <div className="bg-red-50/50 rounded-2xl border border-red-100 p-3.5">
-          <span className="text-xs font-semibold text-red-600">High / Critical</span>
-          <p className="text-xl font-extrabold text-red-700 mt-0.5">{(stats.high || 0) + (stats.critical || 0)}</p>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-        <div className="flex flex-wrap gap-3">
+      {/* Filter & Search Bar */}
+      <div className="glass-panel p-4 space-y-4 border-white/[0.08]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          
           {/* Universal Search */}
-          <div className="flex-1 min-w-[240px] relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              value={filters.search}
-              onChange={(e) => setFilter('search', e.target.value)}
-              placeholder="Search by Ticket ID, Citizen Name, Phone, Email, Location..."
-              className="input-field pl-9 py-2 text-xs sm:text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search Ticket, Citizen, Phone, Location..."
+              className="glass-input pl-10 text-xs py-2.5"
             />
           </div>
 
-          {/* Category filter */}
-          <div className="relative">
+          {/* Category Filter */}
+          <div>
             <select
-              value={filters.category}
-              onChange={(e) => setFilter('category', e.target.value)}
-              className="input-field appearance-none pr-8 py-2 text-xs sm:text-sm w-36"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="glass-input text-xs py-2.5"
             >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c === 'All' ? 'All Categories' : c}
-                </option>
-              ))}
+              <option value="ALL" className="bg-[#07111F]">All Categories</option>
+              <option value="Roads" className="bg-[#07111F]">Roads & Potholes</option>
+              <option value="Streetlights" className="bg-[#07111F]">Streetlights & Power</option>
+              <option value="Garbage" className="bg-[#07111F]">Garbage & Waste</option>
+              <option value="Water" className="bg-[#07111F]">Water Supply</option>
+              <option value="Drainage" className="bg-[#07111F]">Drainage & Sewage</option>
+              <option value="Infrastructure" className="bg-[#07111F]">Infrastructure</option>
             </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          {/* Priority filter */}
-          <div className="relative">
+          {/* Priority Filter */}
+          <div>
             <select
-              value={filters.priority}
-              onChange={(e) => setFilter('priority', e.target.value)}
-              className="input-field appearance-none pr-8 py-2 text-xs sm:text-sm w-32"
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="glass-input text-xs py-2.5"
             >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p === 'All' ? 'All Priorities' : p}
-                </option>
-              ))}
+              <option value="ALL" className="bg-[#07111F]">All Priorities</option>
+              <option value="CRITICAL" className="bg-[#07111F]">CRITICAL</option>
+              <option value="HIGH" className="bg-[#07111F]">HIGH</option>
+              <option value="MEDIUM" className="bg-[#07111F]">MEDIUM</option>
+              <option value="LOW" className="bg-[#07111F]">LOW</option>
             </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          {/* Status filter */}
-          <div className="relative">
+          {/* Status Filter */}
+          <div>
             <select
-              value={filters.status}
-              onChange={(e) => setFilter('status', e.target.value)}
-              className="input-field appearance-none pr-8 py-2 text-xs sm:text-sm w-36"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="glass-input text-xs py-2.5"
             >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s === 'All' ? 'All Statuses' : s}
-                </option>
-              ))}
+              <option value="ALL" className="bg-[#07111F]">All Statuses</option>
+              <option value="REGISTERED" className="bg-[#07111F]">REGISTERED</option>
+              <option value="UNDER_REVIEW" className="bg-[#07111F]">UNDER REVIEW</option>
+              <option value="ASSIGNED" className="bg-[#07111F]">ASSIGNED</option>
+              <option value="IN_PROGRESS" className="bg-[#07111F]">IN PROGRESS</option>
+              <option value="RESOLVED" className="bg-[#07111F]">RESOLVED</option>
+              <option value="REJECTED" className="bg-[#07111F]">REJECTED</option>
             </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
 
-          {/* Date filter */}
-          <div className="relative">
-            <select
-              value={filters.dateFilter}
-              onChange={(e) => setFilter('dateFilter', e.target.value)}
-              className="input-field appearance-none pr-8 py-2 text-xs sm:text-sm w-32"
-            >
-              <option value="All">All Dates</option>
-              <option value="Today">Today</option>
-              <option value="ThisWeek">This Week</option>
-              <option value="ThisMonth">This Month</option>
-            </select>
-            <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          </div>
+        </div>
 
-          {/* Clear button */}
-          {(filters.search || filters.category !== 'All' || filters.priority !== 'All' || filters.status !== 'All' || filters.dateFilter !== 'All') && (
+        <div className="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-white/[0.04]">
+          <span>Showing <strong className="text-white">{filtered.length}</strong> of {complaints.length} complaints</span>
+          {(searchTerm || categoryFilter !== 'ALL' || priorityFilter !== 'ALL' || statusFilter !== 'ALL') && (
             <button
-              onClick={() => setFilters({ search: '', category: 'All', priority: 'All', status: 'All', dateFilter: 'All' })}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-600 px-3 py-2 rounded-xl hover:bg-red-50 transition-colors"
+              onClick={() => {
+                setSearchTerm('');
+                setCategoryFilter('ALL');
+                setPriorityFilter('ALL');
+                setStatusFilter('ALL');
+              }}
+              className="text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" /> Clear
+              Reset Filters
             </button>
           )}
         </div>
       </div>
 
-      {/* Admin Complaint Table (Requested Exact Structure) */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Main Complaints Table */}
+      <div className="glass-panel overflow-hidden border-white/[0.08]">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/80 text-gray-600 text-[11px] font-bold uppercase tracking-wider">
-                <th className="px-4 py-3.5">Ticket ID</th>
-                <th className="px-4 py-3.5">Citizen</th>
-                <th className="px-4 py-3.5">Category</th>
-                <th className="px-4 py-3.5">Priority</th>
-                <th className="px-4 py-3.5">Location</th>
-                <th className="px-4 py-3.5">Status</th>
-                <th className="px-4 py-3.5">Date Reported</th>
-                <th className="px-4 py-3.5 text-center">Action</th>
+          <table className="w-full text-left text-xs">
+            
+            {/* Table Header */}
+            <thead className="bg-[#07111F] text-slate-400 font-mono uppercase tracking-wider border-b border-white/[0.08]">
+              <tr>
+                <th className="py-3.5 px-4 font-bold">Ticket ID</th>
+                <th className="py-3.5 px-4 font-bold">Citizen</th>
+                <th className="py-3.5 px-4 font-bold">Issue / Title</th>
+                <th className="py-3.5 px-4 font-bold">Category</th>
+                <th className="py-3.5 px-4 font-bold">Priority</th>
+                <th className="py-3.5 px-4 font-bold">Location</th>
+                <th className="py-3.5 px-4 font-bold">Status</th>
+                <th className="py-3.5 px-4 font-bold">Date</th>
+                <th className="py-3.5 px-4 font-bold text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+
+            {/* Table Body */}
+            <tbody className="divide-y divide-white/[0.04] text-slate-300">
               {filtered.map((c) => {
-                const citizen = c.citizen_name || c.citizenName || 'Rahul Sharma';
+                const ticketId = c.ticket_id || c.id;
+                const citizenName = c.citizen_name || c.citizenName || 'Citizen';
+                const dateFormatted = c.submittedAt ? new Date(c.submittedAt).toLocaleDateString() : 'Recent';
+
                 return (
-                  <tr key={c.id} className="hover:bg-indigo-50/30 transition-colors group">
+                  <tr key={c.id} className="hover:bg-white/[0.03] transition-colors">
+                    
                     {/* Ticket ID */}
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
-                        {c.id}
-                      </span>
+                    <td className="py-3.5 px-4 font-mono font-bold text-cyan-300 whitespace-nowrap">
+                      {ticketId}
                     </td>
 
-                    {/* Citizen (Who reported it) */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 text-xs font-bold">
-                          {citizen[0]}
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-gray-900">{citizen}</p>
-                          <p className="text-[11px] text-gray-400">{c.phone || '9876543210'}</p>
-                        </div>
-                      </div>
+                    {/* Citizen */}
+                    <td className="py-3.5 px-4 font-medium text-white whitespace-nowrap">
+                      <div>{citizenName}</div>
+                      {c.phone && <div className="text-[10px] text-slate-500 font-mono">{c.phone}</div>}
+                    </td>
+
+                    {/* Issue Title */}
+                    <td className="py-3.5 px-4 max-w-[200px] truncate font-medium">
+                      {c.title}
                     </td>
 
                     {/* Category */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-700">
-                        <span>{getCategoryEmoji(c.category)}</span>
-                        <span className="font-medium">{c.category}</span>
-                      </div>
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/[0.04] border border-white/[0.08] text-slate-300">
+                        {c.category}
+                      </span>
                     </td>
 
                     {/* Priority */}
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={c.priority} size="sm" />
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${getPriorityBadge(c.priority)}`}>
+                        {c.priority}
+                      </span>
                     </td>
 
                     {/* Location */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 text-xs text-gray-600 max-w-[180px]">
-                        <MapPin className="w-3 h-3 text-red-500 flex-shrink-0" />
-                        <span className="truncate" title={c.location}>{c.location}</span>
-                      </div>
+                    <td className="py-3.5 px-4 max-w-[160px] truncate text-slate-400">
+                      {c.location}
                     </td>
 
                     {/* Status */}
-                    <td className="px-4 py-3">
-                      <StatusBadge status={c.status} size="sm" />
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(c.status)}`}>
+                        {c.status}
+                      </span>
                     </td>
 
                     {/* Date */}
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-gray-500">{formatDateTime(c.submittedAt)}</span>
+                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                      {dateFormatted}
                     </td>
 
-                    {/* Action */}
-                    <td className="px-4 py-3 text-center">
+                    {/* Action: View Modal */}
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <button
-                        onClick={() => setSelected(c)}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-all shadow-sm"
+                        onClick={() => setSelectedComplaint(c)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-all hover:scale-105 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        View
+                        <span>View</span>
                       </button>
                     </td>
+
                   </tr>
                 );
               })}
-
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-gray-400">
-                    <p className="font-semibold text-gray-500">No complaints found</p>
-                    <p className="text-xs mt-1">Try changing your search keywords or filter selections.</p>
-                  </td>
-                </tr>
-              )}
             </tbody>
+
           </table>
         </div>
       </div>
 
-      {/* Complete Complaint Breakdown Modal (Requested Section 8 Format) */}
-      <Modal isOpen={!!selected} onClose={() => setSelected(null)} size="lg">
-        {selected && (
-          <div className="p-6 space-y-6 max-h-[85vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+      {/* ============================================================
+          VIEW BREAKDOWN MODAL (4 Explicit Sections)
+         ============================================================ */}
+      {selectedComplaint && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#07111F] border border-white/[0.12] rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 p-6 sm:p-8 animate-in zoom-in-95 duration-200 relative">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-2xl">
-                  {getCategoryEmoji(selected.category)}
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-violet-600 flex items-center justify-center shadow-glow-cyan">
+                  <Shield className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                    {selected.id}
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                    Grievance Detail Blueprint
                   </span>
-                  <h2 className="text-xl font-black text-gray-900 mt-1">{selected.title}</h2>
+                  <h2 className="text-lg font-bold text-white font-display">
+                    Ticket: {selectedComplaint.ticket_id || selectedComplaint.id}
+                  </h2>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedComplaint(null)}
+                className="w-8 h-8 rounded-full bg-white/[0.05] hover:bg-white/[0.10] text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Action Success Alert */}
+            {actionSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{actionSuccess}</span>
+              </div>
+            )}
+
+            {/* Section 1: WHO REPORTED */}
+            <div className="bg-[#0B1625]/70 border border-white/[0.06] rounded-2xl p-4 space-y-2">
+              <span className="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" /> 1. Who Reported
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+                <div>
+                  <span className="text-slate-500">Citizen Name:</span>
+                  <p className="font-bold text-white mt-0.5">{selectedComplaint.citizen_name || selectedComplaint.citizenName || 'Citizen'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Phone Number:</span>
+                  <p className="font-mono text-slate-300 mt-0.5">{selectedComplaint.phone || 'Not provided'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Email Address:</span>
+                  <p className="text-slate-300 truncate mt-0.5">{selectedComplaint.email || 'Not provided'}</p>
                 </div>
               </div>
             </div>
 
-            {/* SECTION 1: WHO REPORTED */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
-              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 mb-3">
-                <User className="w-4 h-4 text-indigo-600" />
-                WHO REPORTED
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white rounded-xl p-3 border border-slate-100">
-                  <span className="text-[11px] text-gray-400 block">Citizen Name</span>
-                  <span className="text-sm font-bold text-gray-900">{selected.citizen_name || selected.citizenName || 'Rahul Sharma'}</span>
+            {/* Section 2: COMPLAINT DETAILS */}
+            <div className="bg-[#0B1625]/70 border border-white/[0.06] rounded-2xl p-4 space-y-2">
+              <span className="text-xs font-mono font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" /> 2. Complaint Details
+              </span>
+              <div className="space-y-2 text-xs pt-1">
+                <div>
+                  <span className="text-slate-500">Title:</span>
+                  <p className="font-bold text-white mt-0.5">{selectedComplaint.title}</p>
                 </div>
-                <div className="bg-white rounded-xl p-3 border border-slate-100">
-                  <span className="text-[11px] text-gray-400 block">Phone Number</span>
-                  <span className="text-sm font-bold text-gray-900">{selected.phone || '9876543210'}</span>
+                <div>
+                  <span className="text-slate-500">Description:</span>
+                  <p className="text-slate-300 mt-0.5 leading-relaxed bg-[#07111F] p-3 rounded-xl border border-white/[0.04]">
+                    {selectedComplaint.description}
+                  </p>
                 </div>
-                <div className="bg-white rounded-xl p-3 border border-slate-100">
-                  <span className="text-[11px] text-gray-400 block">Email Address</span>
-                  <span className="text-sm font-bold text-gray-900 truncate block">{selected.email || 'N/A'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 2: COMPLAINT DETAILS */}
-            <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-indigo-600" />
-                COMPLAINT DETAILS
-              </h3>
-              <div className="bg-white rounded-xl p-3.5 border border-gray-100">
-                <span className="text-[11px] text-gray-400 block mb-1">Description</span>
-                <p className="text-sm text-gray-800 leading-relaxed">{selected.description}</p>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="bg-white rounded-xl p-3 border border-gray-100">
-                  <span className="text-[11px] text-gray-400 block">Category</span>
-                  <span className="text-sm font-bold text-gray-900">{selected.category}</span>
-                </div>
-                <div className="bg-white rounded-xl p-3 border border-gray-100">
-                  <span className="text-[11px] text-gray-400 block">Priority</span>
-                  <div className="mt-1"><PriorityBadge priority={selected.priority} size="sm" /></div>
-                </div>
-                <div className="bg-white rounded-xl p-3 border border-gray-100">
-                  <span className="text-[11px] text-gray-400 block">Current Status</span>
-                  <div className="mt-1"><StatusBadge status={selected.status} size="sm" /></div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <span className="text-slate-500">Category:</span>
+                    <p className="font-bold text-white mt-0.5">{selectedComplaint.category}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Priority:</span>
+                    <p className="font-mono font-bold text-amber-400 mt-0.5">{selectedComplaint.priority}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* SECTION 3: LOCATION */}
-            <div className="bg-gray-50 border border-gray-200/80 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-red-500" />
-                LOCATION
-              </h3>
-              <div className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <span className="text-sm font-semibold text-gray-800">{selected.location}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white rounded-xl p-2.5 border border-gray-100">
-                  <span className="text-[11px] text-gray-400 block">Latitude</span>
-                  <span className="text-xs font-mono font-semibold text-gray-700">{selected.latitude || '16.5062'}</span>
-                </div>
-                <div className="bg-white rounded-xl p-2.5 border border-gray-100">
-                  <span className="text-[11px] text-gray-400 block">Longitude</span>
-                  <span className="text-xs font-mono font-semibold text-gray-700">{selected.longitude || '80.6480'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 4: MANAGEMENT & STATUS WORKFLOW */}
-            <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-4 space-y-3">
-              <h3 className="text-xs font-black text-indigo-900 uppercase tracking-widest flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-indigo-600" />
-                MANAGEMENT & STATUS UPDATE (PostgreSQL Direct)
-              </h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white rounded-xl p-3 border border-indigo-100">
-                  <span className="text-[11px] text-gray-400 block">Assigned Authority</span>
-                  <span className="text-xs font-bold text-indigo-900">{selected.department}</span>
-                </div>
-                <div className="bg-white rounded-xl p-3 border border-indigo-100">
-                  <span className="text-[11px] text-gray-400 block">Created Date</span>
-                  <span className="text-xs font-semibold text-gray-700">{formatDateTime(selected.submittedAt)}</span>
-                </div>
-                <div className="bg-white rounded-xl p-3 border border-indigo-100">
-                  <span className="text-[11px] text-gray-400 block">Last Updated</span>
-                  <span className="text-xs font-semibold text-gray-700">{formatDateTime(selected.updatedAt)}</span>
-                </div>
-              </div>
-
-              {/* Status Update Buttons */}
-              <div className="bg-white rounded-xl p-4 border border-indigo-100 mt-3">
-                <span className="text-xs font-bold text-gray-700 block mb-2">Change Status in Central Database:</span>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: 'REGISTERED', label: 'REGISTERED', color: 'bg-blue-600 text-white' },
-                    { key: 'UNDER_REVIEW', label: 'UNDER_REVIEW', color: 'bg-purple-600 text-white' },
-                    { key: 'ASSIGNED', label: 'ASSIGNED', color: 'bg-indigo-600 text-white' },
-                    { key: 'IN_PROGRESS', label: 'IN_PROGRESS', color: 'bg-amber-600 text-white' },
-                    { key: 'RESOLVED', label: 'RESOLVED', color: 'bg-green-600 text-white' },
-                    { key: 'REJECTED', label: 'REJECTED', color: 'bg-red-600 text-white' },
-                  ].map((btn) => {
-                    const isCurrent = selected.status === btn.key;
-                    return (
-                      <button
-                        key={btn.key}
-                        disabled={updating || isCurrent}
-                        onClick={() => handleStatusUpdate(selected.id, btn.key)}
-                        className={`text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                          isCurrent
-                            ? `${btn.color} ring-2 ring-offset-2 ring-indigo-400 cursor-default shadow-sm`
-                            : 'bg-gray-100 hover:bg-indigo-50 text-gray-700 hover:text-indigo-700'
-                        }`}
-                      >
-                        {isCurrent && <Check className="w-3.5 h-3.5" />}
-                        {btn.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {updating && (
-                  <p className="text-xs text-indigo-600 mt-2 flex items-center gap-1.5 animate-pulse">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Updating database status and synchronizing with citizen tracking page...
+            {/* Section 3: LOCATION */}
+            <div className="bg-[#0B1625]/70 border border-white/[0.06] rounded-2xl p-4 space-y-2">
+              <span className="text-xs font-mono font-bold text-violet-300 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" /> 3. Location & GPS
+              </span>
+              <div className="text-xs pt-1 space-y-1.5">
+                <p className="text-white font-medium">{selectedComplaint.location}</p>
+                {(selectedComplaint.latitude || selectedComplaint.longitude) && (
+                  <p className="font-mono text-cyan-300 text-[11px] flex items-center gap-1">
+                    <Compass className="w-3 h-3" />
+                    <span>Coordinates: {selectedComplaint.latitude}, {selectedComplaint.longitude}</span>
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Timeline */}
-            <div className="pt-2">
-              <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Live Resolution Timeline</h3>
-              <ComplaintTimeline events={selected.timeline} />
+            {/* Section 4: MANAGEMENT & STATUS UPDATE */}
+            <div className="bg-[#0B1625]/90 border border-cyan-500/30 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                <span className="text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" /> 4. Management & Status Updater
+                </span>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${getStatusBadge(selectedComplaint.status)}`}>
+                  Current: {selectedComplaint.status}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <p className="text-slate-400">
+                  <span className="text-slate-500">Assigned Authority: </span>
+                  <strong className="text-white">{selectedComplaint.department || 'Municipal Authority'}</strong>
+                </p>
+
+                <p className="text-slate-400 text-[11px]">
+                  Click any status button below to update PostgreSQL in real time:
+                </p>
+
+                {/* Instant Status Changer Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                  {allStatuses.map((st) => {
+                    const isCurrent = (selectedComplaint.status || '').toUpperCase() === st.toUpperCase();
+                    return (
+                      <button
+                        key={st}
+                        onClick={() => handleStatusChange(st)}
+                        disabled={updatingStatus || isCurrent}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isCurrent
+                            ? 'bg-cyan-500 text-[#050B14] shadow-glow-cyan'
+                            : 'bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.08] text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        {isCurrent && <Check className="w-3.5 h-3.5" />}
+                        <span>{st.replace('_', ' ')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+
+            {/* Modal Close Button */}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedComplaint(null)}
+                className="px-6 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.10] text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Close Modal
+              </button>
+            </div>
+
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
+
     </div>
   );
 };
